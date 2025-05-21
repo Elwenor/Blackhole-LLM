@@ -1,66 +1,62 @@
-O kurczę, moje niedopatrzenie\! Przepraszam najmocniej. Wkleiłem czysty tekst zamiast zastosować formatowanie Markdown. Rozumiem, że suchy tekst to nic przyjemnego dla oka.
+# Blackhole-LLM: An Innovative Architecture for Next-Generation LLMs
 
-Już to nadrabiam\! Poniżej znajdziesz poprawioną wersję `README.md` z odpowiednim formatowaniem Markdown, które nada mu profesjonalny i czytelny wygląd. Zadbałem o nagłówki, listy, pogrubienia i odstępy, aby plik prezentował się schludnie i zachęcał do zapoznania się z treścią.
-
------
-
-# Blackhole-LLM: Innowacyjna Architektura dla Nowej Generacji LLM
-
-Blackhole-LLM to eksperymentalny projekt Pythona, którego głównym celem jest **opracowanie i dopracowanie zaawansowanej architektury dla dużych modeli językowych (LLM)**. Wykorzystując `PyTorch`, koncentruje się na rewolucjonizowaniu sposobu przetwarzania zarówno **tekstu, jak i danych numerycznych**, kładąc nacisk na wnioskowanie matematyczne, obsługę danych strukturalnych oraz modularność całego systemu.
+Blackhole-LLM is my experimental Python project focused on **developing and refining an advanced architecture for Large Language Models (LLMs)**. Leveraging `PyTorch`, my work aims to revolutionize how both **textual and numerical data** are processed, with a strong emphasis on mathematical reasoning, structured input handling, and the overall modularity of the entire system.
 
 -----
 
-### Status Projektu
+### Project Status
 
-Projekt jest w **aktywnej fazie rozwoju architektonicznego**. Obecnie **w pełni funkcjonalne i intensywnie dopracowywane są kluczowe innowacyjne komponenty: niestandardowy system tokenizatora oraz moduł embeddingów numerycznych**. Implementacje testowe głównego modelu językowego, wykorzystujące te komponenty, są w trakcie tworzenia. Blackhole-LLM jest upubliczniony w celach transparentności i prezentacji nowatorskich rozwiązań architektonicznych, jednak **nie jest jeszcze przeznaczony do użytku produkcyjnego ani do samodzielnego uruchamiania przez osoby z zewnątrz**.
+This project is currently in an **active architectural development phase**. At present, my **key innovative components—the custom tokenizer system and the numerical embeddings module—are fully functional and undergoing intensive refinement**. Test implementations of the core language model, which will leverage these innovative components, are under development. Blackhole-LLM is made public for transparency and to showcase novel architectural solutions, however, **it is not yet intended for production use or for independent execution by external users**.
 
-W celu walidacji naszych innowacyjnych komponentów, przygotowaliśmy **wewnętrzne benchmarki i testy jednostkowe**, które porównują wydajność naszego unikalnego Tokenizera z rozwiązaniami takimi jak GPT-2 Tokenizer i BERT.
-
------
-
-### Kluczowe Cechy Architektury
-
-Nasza architektura Blackhole-LLM wyróżnia się następującymi innowacjami:
-
-  * **Innowacyjny Tokenizer**: Niestandardowe rozszerzenie `GPT2TokenizerFast`, zaprojektowane z myślą o efektywnej obsłudze danych numerycznych, symboli matematycznych i wejścia strukturalnego. Skupia się na redukcji rozmiaru słownika i zachowaniu precyzji semantycznej.
-  * **Architektura Podwójnych Embeddingów**: Unikalne podejście do osadzania danych, które łączy tradycyjne embeddingi tekstowe z zaawansowanymi embeddingami numerycznymi. Pozwala to modelowi na głębsze rozumienie zarówno kontekstu językowego, jak i ilościowego.
-  * **Modularna Budowa**: Projekt jest zaprojektowany jako zbiór niezależnych, ale ściśle współpracujących modułów (`tokenizer`, `embedding`, `nova`), co ułatwia rozwój, testowanie i przyszłą rozbudowę.
-  * **Skupienie na Danych Numerycznych i Matematyce**: Architektura od podstaw jest optymalizowana pod kątem przetwarzania danych liczbowych, co czyni ją idealną dla zastosowań wymagających precyzyjnego wnioskowania matematycznego.
-  * **Wewnętrzne Benchmarki i Testy Jednostkowe**: Integracja kompleksowych testów i benchmarków dla poszczególnych komponentów architektury (np. tokenizera, embeddingów), zapewniająca ich wysoką jakość i porównywalność.
+To validate my innovative components, I've prepared **internal benchmarks and unit tests** that compare the performance of my unique Tokenizer against solutions like GPT-2 Tokenizer and BERT.
 
 -----
 
-### Główne Komponenty
+### Key Architectural Features
 
-Projekt Blackhole-LLM składa się z kilku kluczowych pakietów i skryptów, które wspólnie budują naszą architekturę:
+My Blackhole-LLM architecture stands out with the following innovations:
 
-  * **`blackhole/tokenizer/`**: Zawiera innowacyjny tokenizer, odpowiedzialny za przetwarzanie tekstu, rozpoznawanie i specjalną obsługę danych numerycznych, symboli oraz formatowania.
-      * Szczegółowe informacje o jego działaniu, zaletach, ograniczeniach oraz wyniki naszych **wewnętrznych benchmarków** znajdziesz tutaj: **[Szczegóły i Benchmarki Tokenizera](https://www.google.com/search?q=Benchmark_Tokenizer.md)**
-  * **`blackhole/embedding/`**: Moduły odpowiedzialne za tworzenie embeddingów, w tym zaawansowany system dla danych numerycznych, który przekształca liczby w wektory zrozumiałe dla modelu.
-      * Poznaj szczegóły dotyczące naszej architektury embeddingów numerycznych, ich korzyści, wyzwań oraz wyniki **wewnętrznych benchmarków** tutaj: **[Szczegóły i Benchmarki Embeddingów Numerycznych](https://www.google.com/search?q=Benchmark_Embedding.md)**
-  * **`blackhole/nova/`**: Docelowe miejsce dla rdzenia architektury modelu językowego (np. klasy Transformer), który będzie integrował tokeny i embeddingi numeryczne.
-  * **`scripts/`**: Katalog zawierający skrypty do zarządzania projektem, w tym:
-      * Testy jednostkowe (`scripts/tests/`).
-      * Skrypty benchmarkowe (`scripts/benchmarks/`).
-      * Skrypty do trenowania i ewaluacji modelu (w trakcie rozwoju).
+  * **Innovative Tokenizer**: A custom extension of `GPT2TokenizerFast`, designed for efficient handling of numerical data, mathematical symbols, and structured input. It focuses on reducing vocabulary size while preserving semantic precision.
+  * **Dual Embedding Architecture**: A unique approach to data embedding that combines traditional textual embeddings with advanced numerical embeddings. This allows the model to gain a deeper understanding of both linguistic and quantitative contexts.
+  * **Modular Design**: The project is designed as a collection of independent yet closely integrated modules (`tokenizer`, `embedding`, `nova`), facilitating development, testing, and future expansion.
+  * **Focus on Numerical Data and Mathematics**: The architecture is optimized from the ground up for processing numerical data, making it ideal for applications requiring precise mathematical reasoning.
+  * **Internal Benchmarks and Unit Tests**: Integration of comprehensive tests and benchmarks for individual architectural components (e.g., tokenizer, embeddings) ensures their high quality and comparability.
 
 -----
 
-### Przyszłe Plany Rozwojowe
+### Core Components
 
-Naszym długoterminowym celem jest zbudowanie pełnego, efektywnego LLM, który w pełni wykorzysta możliwości naszej innowacyjnej architektury tokenizacyjno-embeddingowej. Kolejne etapy rozwoju obejmują:
+My Blackhole-LLM project consists of several key packages and scripts that collectively build its architecture:
 
-  * Dalsze rozwijanie i optymalizacja architektury głównego modelu (`NovaModel`).
-  * Implementacja i dopracowanie pełnego procesu treningowego LLM, wykorzystującego podwójne embeddingi.
-  * Dodanie zaawansowanych funkcji ewaluacji i predykcji dla całego modelu.
-  * Integracja z większymi zbiorami danych i rzeczywistymi zadaniami NLP.
+  * **`blackhole/tokenizer/`**: This directory contains my innovative tokenizer, responsible for text processing, recognition, and special handling of numerical data, symbols, and formatting.
+      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: **[Tokenizer Details and Benchmarks](https://www.google.com/search?q=Benchmark_Tokenizer.md)**
+  * **`blackhole/embedding/`**: These modules are responsible for creating embeddings, including my advanced system for numerical data that transforms numbers into vectors understandable by the model.
+      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: **[Numerical Embeddings Details and Benchmarks](https://www.google.com/search?q=Benchmark_Embedding.md)**
+  * **`blackhole/nova/`**: This is the designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
+  * **`scripts/`**: This directory contains various scripts for project management, including:
+      * Unit tests (`scripts/tests/`).
+      * Benchmark scripts (`scripts/benchmarks/`).
+      * Model training and evaluation scripts (under development).
 
 -----
 
-### Licencja
+### Future Development Plans
 
-Ten projekt jest objęty licencją [MIT License](https://www.google.com/search?q=LICENSE).
+My long-term goal is to build a full, effective LLM that fully leverages the capabilities of my innovative tokenizer and embedding architecture. Subsequent development stages include:
+
+  * Further development and optimization of the main model architecture (`NovaModel`).
+  * Implementation and refinement of the complete LLM training process, utilizing dual embeddings.
+  * Adding advanced evaluation and prediction functionalities for the entire model.
+  * Integration with larger datasets and real-world NLP tasks.
 
 -----
 
-Mam nadzieję, że teraz `README.md` wygląda znacznie lepiej i jest przyjemniejszy w czytaniu\!
+### License
+
+This project is licensed under the [MIT License](https://www.google.com/search?q=LICENSE).
+
+-----
+
+💡 **Note**: As an architectural project focused on innovation, there are no immediate installation or execution instructions provided in this `README.md`. The detailed design and benchmark results for the tokenizer and embeddings are available in their respective documentation files.
+
+-----
