@@ -212,7 +212,7 @@ bert_tokens = bert_tok.tokenize(text)
 bert_detok = bert_tok.convert_tokens_to_string(bert_tokens)
 print_summary("BERT", bert_tokens, bert_detok)
 ```
-### Output:
+### Output Benchmark:
 
 ```
 ## Blackhole
