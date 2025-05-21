@@ -4,17 +4,12 @@ import torch
 import math
 
 # Adjust the path to allow importing from the blackhole package
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 # Import from the new, structured path
-from blackhole.tokenizer.tokenizer import tokenize
-from blackhole.embedding.embedding import number_embedding_features, decode_number_from_features, TokenEmbedding, NumberEmbedding
+from blackhole.tokenizer import *
+from blackhole.embedding import *
 
-# NOTE: prepare_inputs was not imported in the original files but is used.
-# If prepare_inputs is a utility function that should be in utils/data_prep.py,
-# then we should import it from there. For the purpose of this test file,
-# I've included a simple version of prepare_inputs here, but in a real project,
-# it should be imported.
 
 def prepare_inputs(tokens, number_map, dim=128):
     """

@@ -3,11 +3,9 @@ from datasets import load_dataset
 import sys, os
 import re # Make sure re is imported here as well if not already done
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# Make sure these imports correctly point to your tokenizer.py
-# If your tokenizer.py is in blackhole/tokenizer/, then the above sys.path.insert
-# and `from blackhole.tokenizer import tokenize, detokenize` should work.
-from blackhole.tokenizer.tokenizer import tokenize, detokenize # Adjusted import path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
+
+from blackhole.tokenizer.tokenizer import *
 
 DATASETS = [
     {

@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 from tabulate import tabulate
 
 # Ensure blackhole tokenizer is importable
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from blackhole.tokenizer import tokenize, detokenize
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
+
+from blackhole.tokenizer import *
 
 MAX_TOKENS = 10_000_000  # Max tokens limit across all samples
 

@@ -4,11 +4,9 @@ import torch # Not strictly needed for tokenizer alone, but often present in PyT
 from transformers import GPT2TokenizerFast, BertTokenizerFast
 from datasets import load_dataset # Make sure you have datasets installed: pip install datasets
 
-# Adjust the path to allow importing from the blackhole package
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-# Import from the new, structured path
-from blackhole.tokenizer.tokenizer import tokenize, detokenize, summarize_tokens
+from blackhole.tokenizer import *
 
 DATASETS = [
     {"name": "General Text", "dataset": "wikitext", "subset": "wikitext-2-raw-v1", "split": "train", "field": "text"},
