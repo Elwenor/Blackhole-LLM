@@ -76,7 +76,9 @@ The price rose from $1,234.56 on 2023-05-20 to 0x1A3F units by 12:30 PM. Meanwhi
 tokens = tokenize(text)
 print("Tokens:", tokens)
 ```
-The output below shows the token list generated from the input text by the custom tokenizer. Special tokens like <|num|>, <|cap|>, and <|space|> are used to encode numbers, capitalization, and spaces explicitly. This structured representation helps the model better understand numeric and formatted data.
+Special tokens like <|num|>, <|cap|>, and <|space|> are used to encode numbers, capitalization, and spaces explicitly. This structured representation helps the model better understand numeric and formatted data.
+
+# Output:
 
 ```plaintext
 Tokens: ['<|cap|>', 'the', '<|space|>', 'price', '<|space|>', 'rose', '<|space|>', 'from', '<|space|>', '$', '<|num|>', 'on', '<|num|>', '-', '<|num|>', '-', '<|num|>'...
