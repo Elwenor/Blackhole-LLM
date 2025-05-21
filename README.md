@@ -90,7 +90,9 @@ Tokens: ['<|cap|>', 'the', '<|space|>', 'price', '<|space|>', 'rose', '<|space|>
 ```python
 from blackhole.tokenizer import tokenize
 
-...
+text = """
+The price rose from $1,234.56 on 2023-05-20 to 0x1A3F units by 12:30 PM. Meanwhile, the experimental drug reduced the virus count by 0.000123 units ...
+"""
 
 print("\nNumber Map (token index → (value, type, raw)):")
 for idx, (val, typ, raw) in number_map.items():
