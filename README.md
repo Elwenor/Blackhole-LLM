@@ -175,4 +175,6 @@ This example shows how the tokenizer handles complex numeric formats by replacin
 **Cons:**  
 - The tokenizer abstracts away the numeric value into a single token, so downstream tasks must rely on the number map for precise numeric data; this can complicate some use cases if not handled properly.
 
-
+## Detokenization Comparison Example
+> Note:
+>The detokenization feature is currently under active development. While it already reconstructs the original text >with good accuracy—including numeric formatting and spacing—it may still produce minor formatting inconsistencies. >Improvements are ongoing to ensure even better output fidelity in future releases.
