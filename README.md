@@ -17,9 +17,11 @@ Blackhole-LLM — An experimental Python framework for building and customizing 
 
 ---
 
-## Usage Example
+## Tokenizer
 
-### Tokenizer
+The tokenizer is a customized version of `GPT2TokenizerFast`, adapted for structured and numerical data. It aims to optimize token distribution and reduce unnecessary fragmentation — particularly important for mathematical inputs.
+
+### Basic Usage
 
 ```python
 from blackhole.tokenizer import BlackholeTokenizer
