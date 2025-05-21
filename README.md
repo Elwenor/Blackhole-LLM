@@ -64,7 +64,7 @@ The tokenizer is a custom extension of `GPT2TokenizerFast`, designed specificall
 
 ---
 
-### Tokens output example
+## Tokens output example
 
 ```python
 from blackhole.tokenizer import tokenize
@@ -73,14 +73,40 @@ text = """
 The price rose from $1,234.56 on 2023-05-20 to 0x1A3F units by 12:30 PM. Meanwhile, the experimental drug reduced the virus count by 0.000123 units ...
 """
 
-tokens = tokenize(text)
+tokens, number_map = tokenize(text)
 print("Tokens:", tokens)
 ```
 Special tokens like <|num|>, <|cap|>, and <|space|> are used to encode numbers, capitalization, and spaces explicitly. This structured representation helps the model better understand numeric and formatted data.
 
-# Output:
+### Output:
 
 ```plaintext
 Tokens: ['<|cap|>', 'the', '<|space|>', 'price', '<|space|>', 'rose', '<|space|>', 'from', '<|space|>', '$', '<|num|>', 'on', '<|num|>', '-', '<|num|>', '-', '<|num|>'...
 ```
 
+### Tokens numbermap example
+
+```python
+from blackhole.tokenizer import tokenize
+
+...
+
+print("\nNumber Map (token index → (value, type, raw)):")
+for idx, (val, typ, raw) in number_map.items():
+    print(f"{idx}: {val} ({typ}), raw: {raw}")
+
+```
+
+### Output:
+
+```plaintext
+Number Map (token index → (value, type, raw)):
+10: 1234.56 (float), raw: 1,234.56
+12: 2023 (int), raw:  2023
+14: 5 (int), raw:  05
+16: 20 (int), raw:  20
+18: 6719 (hex), raw:  0x1A3F
+22: 12 (int), raw:  12
+24: 30 (int), raw:  30
+45: 0.000123 (float), raw:  0.000123
+```
