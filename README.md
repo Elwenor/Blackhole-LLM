@@ -19,31 +19,48 @@ Blackhole-LLM — An experimental Python framework for building and customizing 
 
 ## Tokenizer
 
-The tokenizer is a customized extension of `GPT2TokenizerFast`, specifically designed to handle structured and numerical text inputs with higher efficiency and precision.
+The tokenizer is a custom extension of `GPT2TokenizerFast` tailored to efficiently handle structured, numerical, and mathematical text.
 
-It introduces several innovations:
+### How it works
 
-- **Special tokens** to explicitly mark numbers (`<|num|>`), capitalization (`<|cap|>`), spaces (`<|space|>`), and common mathematical symbols (`∞`, `π`, `√`, `≈`, `±`).
-- **Pattern matching** to detect and isolate numerical data types such as integers, floats, hexadecimals, dates, and times, converting them into uniform tokens while preserving their original values and types separately.
-- **Capitalization handling** via dedicated tokens that track case changes without inflating vocabulary size.
-- **Explicit spacing tokens** that preserve input structure critical for scientific and mathematical texts.
-- During detokenization, stored metadata ensures the exact reconstruction of the original text, including spacing, capitalization, and numeric precision.
+- **Special tokens** are introduced for key elements:  
+  - `<|num|>` marks all numbers (integers, floats, hexadecimals, dates, times), enabling uniform treatment of numeric data.  
+  - `<|cap|>` indicates capitalization, avoiding bloated vocabularies due to case variants.  
+  - `<|space|>` preserves spaces explicitly to maintain input formatting.  
+  - Mathematical symbols like π, ∞, √, ± are also treated as special tokens.
 
-### Why this matters
+- The tokenizer uses **regular expressions** to detect complex numeric patterns such as:  
+  - Hexadecimal numbers (`0x...`)  
+  - Dates (`YYYY-MM-DD` or `YYYY/MM/DD`)  
+  - Times (`HH:MM` or `HH:MM:SS`)  
+  - Standard integers and floating-point numbers, including scientific notation.
 
-Standard tokenizers like GPT2 or BERT tend to fragment numeric and mathematical content into many unique tokens, inflating vocabulary size and complicating model learning. This tokenizer reduces fragmentation, making numeric reasoning and structured input processing more efficient and reliable.
+- Upon finding these patterns, it replaces them with `<|num|>` tokens, while storing the original numeric values and types separately. This allows the model to maintain precise numeric information without inflating token counts.
+
+- Words starting with uppercase followed by lowercase letters trigger the insertion of `<|cap|>` tokens before their lowercase form, capturing capitalization without duplicating tokens.
+
+- Spaces between tokens are encoded explicitly as `<|space|>` tokens, improving the model's understanding of text structure and spacing.
+
+- The tokenizer also cleans and normalizes input by removing extraneous whitespace and fixing common number formatting issues (like misplaced commas or dots).
+
+### Benefits
+
+- **Reduced vocabulary size** compared to standard tokenizers like GPT-2 or BERT, thanks to unified numeric tokenization and capitalization tokens.  
+- **Improved mathematical and structured text representation**, essential for tasks involving numbers, formulas, or dates.  
+- Facilitates **accurate reconstruction** of original text with detokenization, preserving formatting, capitalization, and numeric precision.
 
 ### Limitations
 
-- Best suited for structured and mathematical text rather than conversational language.
-- May require tuning to cover edge cases in complex numeric/date formats.
+- Tailored for structured and numeric-heavy text; less optimized for casual conversational language.  
+- Complex or ambiguous numeric formats might require further refinement.
 
-### Basic Usage
+### Basic Usage Example
 
 ```python
 from blackhole.tokenizer import BlackholeTokenizer
 
 tokenizer = BlackholeTokenizer()
-tokens = tokenizer.encode("The mass of the black hole is 10^30 kg.")
+tokens, number_map = tokenizer.tokenize("The mass of the black hole is 10^30 kg.")
 print(tokens)
+
 
