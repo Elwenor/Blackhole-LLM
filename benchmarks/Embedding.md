@@ -43,7 +43,7 @@ if __name__ == "__main__":
     test_embedding_decode()
     test_prepare_inputs()
 ```
-### Embadding Ouput:
+### Embedding Ouput:
 
 ```
 Text:
