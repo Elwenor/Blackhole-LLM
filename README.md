@@ -1,14 +1,6 @@
 # Blackhole-LLM: An Innovative Architecture for Next-Generation LLMs
 
-Blackhole-LLM is my experimental Python project focused on **developing and refining an advanced architecture for Large Language Models (LLMs)**. Leveraging `PyTorch`, my work aims to revolutionize how both **textual and numerical data** are processed, with a strong emphasis on mathematical reasoning, structured input handling, and the overall modularity of the entire system.
-
------
-
-### Project Status
-
-This project is currently in an **active architectural development phase**. At present, my **key innovative components—the custom tokenizer system and the numerical embeddings module—are fully functional and undergoing intensive refinement**. Test implementations of the core language model, which will leverage these innovative components, are under development. Blackhole-LLM is made public for transparency and to showcase novel architectural solutions, however, **it is not yet intended for production use or for independent execution by external users**.
-
-To validate my innovative components, I've prepared **internal benchmarks and unit tests** that compare the performance of my unique Tokenizer against solutions like GPT-2 Tokenizer and BERT.
+Blackhole-LLM is my experimental Python project focused on **developing and refining an architecture for Large Language Models (LLMs)**. Leveraging `PyTorch`, my work aims to revolutionize how both **textual and numerical data** are processed, with a strong emphasis on mathematical reasoning, structured input handling, and the overall modularity of the entire system.
 
 -----
 
@@ -57,6 +49,15 @@ This project is licensed under the [MIT License](https://www.google.com/search?q
 
 -----
 
-💡 **Note**: As an architectural project focused on innovation, there are no immediate installation or execution instructions provided in this `README.md`. The detailed design and benchmark results for the tokenizer and embeddings are available in their respective documentation files.
-
------
+```
+> [!WARNING]
+> ### ⚠️ Project Status - Important Information! ⚠️
+>
+> This project is currently in an **active architectural development phase**. At present, my **key innovative components—the custom tokenizer system and the numerical embeddings module—are fully functional and undergoing intensive refinement**.
+>
+> Test implementations of the core language model, which will leverage these innovative components, are under development.
+>
+> Blackhole-LLM is made public for transparency and to showcase novel architectural solutions. **However, it is not yet intended for production use or for independent execution by external users.**
+>
+> To validate my innovative components, I've prepared **internal benchmarks and unit tests** that compare the performance of my unique Tokenizer against solutions like GPT-2 Tokenizer and BERT.
+```
