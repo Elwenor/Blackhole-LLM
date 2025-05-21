@@ -4,9 +4,8 @@ Blackhole-LLM is my experimental Python project focused on **developing and refi
 
 -----
 
-> [\!WARNING]
+> [\!WARNING Project Status - Important Information]
 >
-> ### ⚠️ Project Status - Important Information\! ⚠️
 >
 > This project is currently in an **active architectural development phase**. At present, my **key innovative components—the custom tokenizer system and the numerical embeddings module—are fully functional and undergoing intensive refinement**.
 >
