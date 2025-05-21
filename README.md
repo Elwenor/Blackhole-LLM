@@ -85,7 +85,7 @@ Tokens: ['<|cap|>', 'the', '<|space|>', 'price', '<|space|>', 'rose', '<|space|>
 ```
 
 
-### Tokens numbermap example
+## Tokens numbermap example
 
 ```python
 from blackhole.tokenizer import tokenize
