@@ -4,6 +4,7 @@ Blackhole-LLM — An experimental Python framework for building and customizing 
 
 > This project is under active development.  
 > It's public for transparency and feedback, but not yet intended for production use.
+
 > ! IT CURRENTLY HAS A WORKING TOKENIZER AND ITS EMBEDDING. CREATING TEST MODELS IS IN THE DEVELOPMENT STAGE !
 > ! LOCAL BENCHMARK NLP AVAILABLE. GPT2 TOKENIZER + BERT vs BLACKHOLE !
 
