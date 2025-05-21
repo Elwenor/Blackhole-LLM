@@ -259,7 +259,7 @@ Blackhole replaces numeric values with a special abstraction, effectively substi
 - Preserves numeric values as single conceptual units rather than fragmenting them into multiple tokens (e.g., `1,234.56` is treated as one float value, not split into `1`, `,`, `234`, `.`, `56`).
 - Handles hexadecimal values and timestamps similarly, keeping them intact in the number map.
 
-However, this abstraction is not perfect. For example, dates such as `2023-07-15` are tokenized into separate integer tokens `2023`, `7`, and `15`, losing the direct connection to the original date format. So while numeric values are extracted and abstracted, the tokenization does not preserve the full original formatting in all cases.
+>However, this abstraction is not perfect. For example, dates such as `2023-07-15` are tokenized into separate integer tokens `2023`, `7`, and `15`, losing the direct connection to the original date format. So while numeric values are extracted and abstracted, >the tokenization does not preserve the full original formatting in all cases.
 
 ## GPT-2 and BERT Tokenizers
 
