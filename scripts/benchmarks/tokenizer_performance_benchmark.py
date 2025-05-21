@@ -131,9 +131,6 @@ def run_benchmark(texts, dataset_name):
             token_count = sample_res.get(f"{key}_tokens", 0)
             sample_res[f"{key}_chars_per_token"] = (len(text) / token_count) if token_count > 0 else 0
         
-        # If you want to print the number_map, unpack all five elements per entry:
-        # for idx_map, (val, typ, raw, prev_sp, next_sp) in number_map.items():
-        #     print(f"{idx_map}: value={val}, type={typ}, raw='{raw}', prev_space={prev_sp}, next_space={next_sp}")
         
         results.append(sample_res)
     
