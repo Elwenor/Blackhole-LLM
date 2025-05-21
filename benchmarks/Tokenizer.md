@@ -121,9 +121,15 @@ When dealing with tasks that require mathematical understanding, financial data 
 
 ### Advantages of Blackhole Tokenizer Approach:
 
-- **Compact and focused vocabulary**: Smaller token sets mean faster training and less chance of overfitting on spurious token fragments.
-- **Better numeric reasoning**: Treating numbers as atomic units aligns better with how humans conceptualize numbers.
-- **Easier integration with downstream numeric modules**: The separate number map can be plugged into models or algorithms that expect precise numerical input.
+- **Compact and focused vocabulary:**  
+  By replacing all numbers with a special abstract token and maintaining a separate numeric map, Blackhole drastically reduces the number of unique tokens in the model’s vocabulary. A smaller, more focused vocabulary leads to faster training and better generalization, as the model isn’t distracted by countless numeric fragments or rare tokens that only represent different numerical values. This lowers the risk of overfitting on spurious token fragments and helps the model concentrate on meaningful semantic patterns and relationships between words and numbers.
+
+- **Better numeric reasoning:**  
+  Numbers are treated as atomic units — full values instead of fragmented pieces (for example, `1,234.56` is one token rather than a sequence like `1`, `,`, `234`, `.`, `56`). This allows the model to associate tokens directly with their numeric meanings, making it easier to learn mathematical patterns, comparisons, and numeric relationships within natural language. The model isn’t forced to reconstruct values from disjointed tokens, which significantly improves its ability to reason about quantities.
+
+- **Easier integration with downstream numeric modules (dual embedding channels):**  
+  One of Blackhole’s key innovations is the separation of the token stream into **two parallel channels**: the standard textual tokens and a numeric map containing the actual values, types, and positions of numbers. This dual-channel design means numerical information can be fed independently into the model’s embedding layers or downstream components as a separate, structured signal. Consequently, models can leverage both the contextual language embeddings **and** precise numeric embeddings simultaneously, greatly enhancing their ability to handle complex numeric reasoning tasks, perform arithmetic operations, or integrate with external numerical solvers. This architecture effectively adds an additional “numeric modality” to traditional text embeddings, opening the door to more sophisticated, multimodal understanding within language models.
+
 
 ### Limitations to Keep in Mind:
 
@@ -150,5 +156,3 @@ When dealing with tasks that require mathematical understanding, financial data 
 This comparison highlights that while Blackhole Tokenizer is still evolving, its approach to numeric tokenization provides a solid foundation for models aimed at improved understanding of mathematical and numeric content, outperforming standard tokenizers in these critical areas.
 
 ---
-
-*If you want to dive deeper or see example code for implementing this tokenizer, I can help with that too.*
