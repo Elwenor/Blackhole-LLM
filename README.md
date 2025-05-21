@@ -19,7 +19,24 @@ Blackhole-LLM — An experimental Python framework for building and customizing 
 
 ## Tokenizer
 
-The tokenizer is a customized version of `GPT2TokenizerFast`, adapted for structured and numerical data. It aims to optimize token distribution and reduce unnecessary fragmentation — particularly important for mathematical inputs.
+The tokenizer is a customized extension of `GPT2TokenizerFast`, specifically designed to handle structured and numerical text inputs with higher efficiency and precision.
+
+It introduces several innovations:
+
+- **Special tokens** to explicitly mark numbers (`<|num|>`), capitalization (`<|cap|>`), spaces (`<|space|>`), and common mathematical symbols (`∞`, `π`, `√`, `≈`, `±`).
+- **Pattern matching** to detect and isolate numerical data types such as integers, floats, hexadecimals, dates, and times, converting them into uniform tokens while preserving their original values and types separately.
+- **Capitalization handling** via dedicated tokens that track case changes without inflating vocabulary size.
+- **Explicit spacing tokens** that preserve input structure critical for scientific and mathematical texts.
+- During detokenization, stored metadata ensures the exact reconstruction of the original text, including spacing, capitalization, and numeric precision.
+
+### Why this matters
+
+Standard tokenizers like GPT2 or BERT tend to fragment numeric and mathematical content into many unique tokens, inflating vocabulary size and complicating model learning. This tokenizer reduces fragmentation, making numeric reasoning and structured input processing more efficient and reliable.
+
+### Limitations
+
+- Best suited for structured and mathematical text rather than conversational language.
+- May require tuning to cover edge cases in complex numeric/date formats.
 
 ### Basic Usage
 
@@ -29,3 +46,4 @@ from blackhole.tokenizer import BlackholeTokenizer
 tokenizer = BlackholeTokenizer()
 tokens = tokenizer.encode("The mass of the black hole is 10^30 kg.")
 print(tokens)
+
