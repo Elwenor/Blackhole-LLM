@@ -2,10 +2,11 @@
 
 Blackhole-LLM is my experimental Python project focused on **developing and refining an advanced architecture for Large Language Models (LLMs)**. Leveraging `PyTorch`, my work aims to revolutionize how both **textual and numerical data** are processed, with a strong emphasis on mathematical reasoning, structured input handling, and the overall modularity of the entire system.
 
----
+-----
 
-> [!WARNING]
-> ### ⚠️ Project Status - Important Information! ⚠️
+> [\!WARNING]
+>
+> ### ⚠️ Project Status - Important Information\! ⚠️
 >
 > This project is currently in an **active architectural development phase**. While my **key innovative components—the custom tokenizer system and the numerical embeddings module—are functional and being actively refined**, their design and implementation are still subject to **ongoing improvements and potential significant changes**. This means their current state, though operational, is **experimental and not yet optimized for general utility or stability.**
 >
@@ -15,7 +16,7 @@ Blackhole-LLM is my experimental Python project focused on **developing and refi
 >
 > To validate my innovative components, I've prepared **internal benchmarks and unit tests** that compare the performance of my unique Tokenizer against solutions like GPT-2 Tokenizer and BERT.
 
----
+-----
 
 ### Key Architectural Features
 
@@ -34,9 +35,9 @@ My Blackhole-LLM architecture stands out with the following innovations:
 My Blackhole-LLM project consists of several key packages and scripts that collectively build its architecture:
 
   * **`blackhole/tokenizer/`**: This directory contains my innovative tokenizer, responsible for text processing, recognition, and special handling of numerical data, symbols, and formatting.
-      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: **[Tokenizer Details and Benchmarks](https://www.google.com/search?q=Benchmark_Tokenizer.md)**
+      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://www.google.com/search?q=Benchmark_Tokenizer.md)
   * **`blackhole/embedding/`**: These modules are responsible for creating embeddings, including my advanced system for numerical data that transforms numbers into vectors understandable by the model.
-      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: **[Numerical Embeddings Details and Benchmarks](https://www.google.com/search?q=Benchmark_Embedding.md)**
+      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://www.google.com/search?q=Benchmark_Embedding.md)
   * **`blackhole/nova/`**: This is the designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
   * **`scripts/`**: This directory contains various scripts for project management, including:
       * Unit tests (`scripts/tests/`).
@@ -63,5 +64,3 @@ This project is licensed under the [MIT License](https://www.google.com/search?q
 -----
 
 💡 **Note**: As an architectural project focused on innovation, there are no immediate installation or execution instructions provided in this `README.md`. The detailed design and benchmark results for the tokenizer and embeddings are available in their respective documentation files.
-
------
