@@ -246,3 +246,28 @@ print_summary("BERT", bert_tokens, bert_detok)
 - **Total tokens:** 42  
 - **Unique tokens:** 33
 ```
+
+# Comparison of Blackhole Tokenizer with GPT-2 and BERT
+
+This example demonstrates how different tokenizers handle complex numeric formats such as dates, floats with commas, hexadecimal numbers, and timestamps.
+
+## Blackhole Tokenizer
+
+Blackhole replaces numeric values with a special abstraction, effectively substituting all numbers with a unified token (represented here conceptually) and maintaining a separate number map. This approach:
+
+- Reduces the total number of unique tokens significantly (19 unique tokens vs. 33-34 in other tokenizers).
+- Preserves numeric values as single conceptual units rather than fragmenting them into multiple tokens (e.g., `1,234.56` is treated as one float value, not split into `1`, `,`, `234`, `.`, `56`).
+- Handles hexadecimal values and timestamps similarly, keeping them intact in the number map.
+
+However, this abstraction is not perfect. For example, dates such as `2023-07-15` are tokenized into separate integer tokens `2023`, `7`, and `15`, losing the direct connection to the original date format. So while numeric values are extracted and abstracted, the tokenization does not preserve the full original formatting in all cases.
+
+## GPT-2 and BERT Tokenizers
+
+Both GPT-2 and BERT tokenize numeric data by splitting on formatting characters. This results in:
+
+- Higher total token counts (42 tokens in the example).
+- A larger number of unique tokens (33–34 unique tokens).
+- Fragmentation of numeric values into multiple tokens (e.g., splitting numbers with commas, dots, or hex prefixes).
+- Less efficient vocabulary usage, as each numeric component is stored as a separate token.
+
+
