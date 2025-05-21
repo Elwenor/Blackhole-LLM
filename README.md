@@ -126,3 +126,53 @@ This design:
 - Preserves numeric precision and formatting for accurate reconstruction (detokenization).  
 - Enables the model to better understand and reason about numeric and structured data.
 
+## Tokens token sumary and unique token example
+
+```python
+from blackhole.tokenizer import tokenize, summarize_tokens
+
+text = """
+The price rose from $1,234.56 on 2023-05-20 to 0x1A3F units by 12:30 PM. Meanwhile, the experimental drug reduced the virus count by 0.000123 units ...
+"""
+
+tokens, number_map = tokenize(text)
+
+print("\nToken Summary:")
+for tok, idx, count in summarize_tokens(tokens):
+    print(f"ID: {idx:2d} | Token: '{tok}' | Count: {count}")
+
+unique_tokens = len(set(tokens))
+print(f"\nNumber of unique tokens: {unique_tokens}")
+```
+### Output:
+```
+Token Summary:
+ID:  0 | Token: '<|cap|>' | Count: 2
+ID:  1 | Token: 'the' | Count: 3
+ID:  2 | Token: '<|space|>' | Count: 12
+ID:  3 | Token: 'price' | Count: 1
+ID:  4 | Token: 'rose' | Count: 1
+ID:  5 | Token: 'from' | Count: 1
+ID:  6 | Token: '$' | Count: 1
+...
+
+Number of unique tokens: 23
+```
+
+This example shows how the tokenizer handles complex numeric formats by replacing all numbers with a unique `<|num|>` token. This means:
+
+- Numeric formatting like commas, leading zeros, hex notation, or scientific notation is **not broken into multiple tokens**, preserving the original number as a single conceptual unit.  
+- This drastically **reduces the number of unique tokens** needed in the vocabulary, keeping it compact and efficient.  
+- As seen in the output, the `<|num|>` token frequently appears, representing all numeric values uniformly.
+
+### Trade-offs
+
+**Pros:**  
+- Smaller vocabulary  
+- Better numeric precision  
+- Easier reasoning about numbers in the model  
+
+**Cons:**  
+- The tokenizer abstracts away the numeric value into a single token, so downstream tasks must rely on the number map for precise numeric data; this can complicate some use cases if not handled properly.
+
+
