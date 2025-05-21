@@ -64,22 +64,21 @@ The tokenizer is a custom extension of `GPT2TokenizerFast`, designed specificall
 
 ---
 
-## Usage Example
+### Tokens output example
 
 ```python
+from blackhole.tokenizer import tokenize
+
 text = """
-The experimental drug reduced the virus count by 0.000123 units, which is a 99.999% improvement compared to the previous 1.2e-4 baseline. The lab reported 12,345 samples processed, with an error margin of ±0.0001.
+The price rose from $1,234.56 on 2023-05-20 to 0x1A3F units by 12:30 PM. Meanwhile, the experimental drug reduced the virus count by 0.000123 units ...
 """
+
+tokens = tokenize(text)
+print("Tokens:", tokens)
 ```
-What happens here:
+The output below shows the token list generated from the input text by the custom tokenizer. Special tokens like <|num|>, <|cap|>, and <|space|> are used to encode numbers, capitalization, and spaces explicitly. This structured representation helps the model better understand numeric and formatted data.
 
-- The text is scanned for words, punctuation, and complex numbers (floats, scientific notation, hexadecimals, dates, times).
-
-- Numbers get replaced by a special `<|num|>` token to standardize representation.
-
-- Words starting with a capital letter are flagged with `<|cap|>`, then lowercased, preserving capitalization info separately.
-
-- Spaces between tokens are explicitly encoded as `<|space|>` tokens to avoid losing spacing info.
-
-- The result is a logically structured token list ready for model consumption.
+```plaintext
+Tokens: ['<|cap|>', 'the', '<|space|>', 'price', '<|space|>', 'rose', '<|space|>', 'from', '<|space|>', '$', '<|num|>', 'on', '<|num|>', '-', '<|num|>', '-', '<|num|>'...
+```
 
