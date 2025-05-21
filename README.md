@@ -113,3 +113,21 @@ Number Map (token index → (value, type, raw)):
 24: 30 (int), raw:  30
 45: 0.000123 (float), raw:  0.000123
 ```
+This output shows how each <|num|> token in the tokenized sequence maps to its original numeric value and format.
+
+Token index: position of the <|num|> token in the token list.
+
+Value and type: the exact numeric value parsed from the text, classified as float, int, or hex.
+
+Raw: the original number string as it appeared, preserving formatting details like commas, leading zeros, or hexadecimal notation.
+
+For example, 1,234.56 is tokenized as <|num|> at index 10, stored as the float 1234.56 with its original formatting kept intact. Dates and times are tokenized as multiple numeric tokens corresponding to their components (year, month, day, hour, minute).
+
+This design:
+
+Keeps the tokenizer vocabulary compact by using a single <|num|> token for all numbers.
+
+Preserves numeric precision and formatting for accurate reconstruction (detokenization).
+
+Enables the model to better understand and reason about numeric and structured data.
+
