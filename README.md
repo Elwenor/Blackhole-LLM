@@ -84,6 +84,7 @@ Special tokens like <|num|>, <|cap|>, and <|space|> are used to encode numbers, 
 Tokens: ['<|cap|>', 'the', '<|space|>', 'price', '<|space|>', 'rose', '<|space|>', 'from', '<|space|>', '$', '<|num|>', 'on', '<|num|>', '-', '<|num|>', '-', '<|num|>'...
 ```
 
+
 ### Tokens numbermap example
 
 ```python
