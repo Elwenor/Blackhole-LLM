@@ -2,21 +2,20 @@
 
 Blackhole-LLM is my experimental Python project focused on **developing and refining an advanced architecture for Large Language Models (LLMs)**. Leveraging `PyTorch`, my work aims to revolutionize how both **textual and numerical data** are processed, with a strong emphasis on mathematical reasoning, structured input handling, and the overall modularity of the entire system.
 
------
+---
 
-> [\!WARNING]
+> [!WARNING]
+> ### ⚠️ Project Status - Important Information! ⚠️
 >
-> ### Project Status - Important Information\!
->
-> This project is currently in an **active architectural development phase**. At present, my **key innovative components—the custom tokenizer system and the numerical embeddings module—are fully functional and undergoing intensive refinement**.
+> This project is currently in an **active architectural development phase**. While my **key innovative components—the custom tokenizer system and the numerical embeddings module—are functional and being actively refined**, their design and implementation are still subject to **ongoing improvements and potential significant changes**. This means their current state, though operational, is **experimental and not yet optimized for general utility or stability.**
 >
 > Test implementations of the core language model, which will leverage these innovative components, are under development.
 >
-> Blackhole-LLM is made public for transparency and to showcase novel architectural solutions. **However, it is not yet intended for production use or for independent execution by external users.**
+> Blackhole-LLM is made public for transparency and to showcase novel architectural solutions. **However, it is not yet intended for production use or for independent execution by external users.** Its primary purpose at this stage is to demonstrate a conceptual approach to LLM architecture.
 >
 > To validate my innovative components, I've prepared **internal benchmarks and unit tests** that compare the performance of my unique Tokenizer against solutions like GPT-2 Tokenizer and BERT.
 
------
+---
 
 ### Key Architectural Features
 
