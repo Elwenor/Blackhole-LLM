@@ -35,9 +35,9 @@ My Blackhole-LLM architecture stands out with the following innovations:
 My Blackhole-LLM project consists of several key packages and scripts that collectively build its architecture:
 
   * **`blackhole/tokenizer/`**: This directory contains my innovative tokenizer, responsible for text processing, recognition, and special handling of numerical data, symbols, and formatting.
-      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://www.google.com/search?q=Benchmark_Tokenizer.md)
+      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/TOKENIZER.md)
   * **`blackhole/embedding/`**: These modules are responsible for creating embeddings, including my advanced system for numerical data that transforms numbers into vectors understandable by the model.
-      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://www.google.com/search?q=Benchmark_Embedding.md)
+      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/EMBEDDING.md)
   * **`blackhole/nova/`**: This is the designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
   * **`scripts/`**: This directory contains various scripts for project management, including:
       * Unit tests (`scripts/tests/`).
