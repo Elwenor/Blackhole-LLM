@@ -1,130 +1,37 @@
-# Blackhole-LLM
+Blackhole-LLM: An Innovative Architecture for Next-Generation LLMs
+Blackhole-LLM is an experimental Python project focused on developing and refining an advanced architecture for Large Language Models (LLMs). Leveraging PyTorch, it aims to revolutionize how both textual and numerical data are processed, with a strong emphasis on mathematical reasoning, structured input handling, and the overall modularity of the system.
 
-Blackhole-LLM — An experimental Python framework for building and customizing large language models in Python, leveraging `torch` (with a roadmap toward full PyTorch integration). It features a tailored `GPT2TokenizerFast`, custom dual embeddings (textual + numerical), and a strong focus on enhancing mathematical reasoning and structured input handling.
+Project Status
+This project is currently in an active architectural development phase. At present, the key innovative components—the custom tokenizer system and the numerical embeddings module—are fully functional and undergoing intensive refinement. Test implementations of the core language model, which will leverage these innovative components, are under development. Blackhole-LLM is made public for transparency and to showcase novel architectural solutions, but it is not yet intended for production use or for independent execution by external users.
 
-> This project is under active development.  
-> It's public for transparency and feedback, but not yet intended for production use.
+To validate our innovative components, we've prepared internal benchmarks and unit tests that compare the performance of our unique Tokenizer against solutions like GPT-2 Tokenizer and BERT.
 
-> ! IT CURRENTLY HAS A WORKING TOKENIZER AND ITS EMBEDDING. CREATING TEST MODELS IS IN THE DEVELOPMENT STAGE !
+Key Architectural Features
+Our Blackhole-LLM architecture stands out with the following innovations:
 
-> ! LOCAL BENCHMARK NLP AVAILABLE. GPT2 TOKENIZER + BERT vs BLACKHOLE !
+Innovative Tokenizer: A custom extension of GPT2TokenizerFast, designed for efficient handling of numerical data, mathematical symbols, and structured input. It focuses on reducing vocabulary size while preserving semantic precision.
+Dual Embedding Architecture: A unique approach to data embedding that combines traditional textual embeddings with advanced numerical embeddings. This allows the model to gain a deeper understanding of both linguistic and quantitative contexts.
+Modular Design: The project is designed as a collection of independent yet closely integrated modules (tokenizer, embedding, nova), facilitating development, testing, and future expansion.
+Focus on Numerical Data and Mathematics: The architecture is optimized from the ground up for processing numerical data, making it ideal for applications requiring precise mathematical reasoning.
+Internal Benchmarks and Unit Tests: Integration of comprehensive tests and benchmarks for individual architectural components (e.g., tokenizer, embeddings) ensures their high quality and comparability.
+Core Components
+The Blackhole-LLM project consists of several key packages and scripts that collectively build our architecture:
 
----
+blackhole/tokenizer/: Contains the innovative tokenizer, responsible for text processing, recognition, and special handling of numerical data, symbols, and formatting.
+For detailed information on its operation, benefits, limitations, and the results of our internal benchmarks, please refer to: Tokenizer Details and Benchmarks
+blackhole/embedding/: Modules responsible for creating embeddings, including an advanced system for numerical data that transforms numbers into vectors understandable by the model.
+Learn more about our numerical embeddings architecture, its benefits, challenges, and future plans here: Numerical Embeddings Details and Benchmarks
+blackhole/nova/: The designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
+scripts/: A directory containing scripts for project management, including:
+Unit tests (scripts/tests/).
+Benchmark scripts (scripts/benchmarks/).
+Model training and evaluation scripts (under development).
+Future Development Plans
+Our long-term goal is to build a full, effective LLM that fully leverages the capabilities of our innovative tokenizer and embedding architecture. Subsequent development stages include:
 
-## Features
-
-- Custom tokenizer based on `GPT2TokenizerFast`, adapted for better handling of numeric, symbolic, and mathematical input  
-- Improved tokenization efficiency: reduces the number of unique tokens compared to standard tokenizers (e.g. GPT-2, BERT) while maintaining logical structure  
-- Dual embedding architecture supporting both textual and numerical feature encoding  
-- Framework-level integration with `torch` (early-stage)  
-- Modular layout with internal benchmarks and unit tests for tokenizer and embedding behavior
-
----
-
-# Tokenizer
-
-The tokenizer is a custom extension of `GPT2TokenizerFast`, designed specifically for efficient processing of texts containing numeric structures, mathematical symbols, and formatted input.
-
----
-
-## How it works
-
-- Introduces special tokens to mark key elements:
-
-  - `<|num|>` — marks all numbers (integers, floats, hexadecimals, dates, times), enabling uniform numeric data handling. This acts as a **placeholder** token replacing the actual numeric literal while its exact value is stored separately to maintain precision and avoid vocabulary explosion.
-  
-  - `<|cap|>` — marks capitalization at the start of words, avoiding vocabulary bloat from case variants by lowering the base token but preserving case information via this prefix token.
-  
-  - `<|space|>` — explicit tokens representing spaces, helping preserve original formatting and sentence structure, which is often lost in classical tokenization.
-  
-  - Mathematical symbols like π, ∞, √, ± are also treated as special tokens to capture their semantic role cleanly.
-
-- Uses **regular expressions** to detect complex numeric patterns such as:
-
-  - Hexadecimal numbers (`0x...`)  
-  - Dates in formats like `YYYY-MM-DD` or `YYYY/MM/DD`  
-  - Times like `HH:MM` or `HH:MM:SS`  
-  - Standard integers, floats, and scientific notation (e.g., `1.2e-4`).
-
-- Upon matching these patterns, replaces them with the `<|num|>` token while storing the original numeric value and its type separately. This lets the tokenizer maintain **precision and semantics** without inflating the token count.
-
-- Words starting with a capital letter (pattern: uppercase letter + lowercase letters) are prefixed with `<|cap|>`, then lowercased, which prevents vocabulary size inflation from multiple capitalized variants.
-
-- Spaces between tokens are explicitly encoded as `<|space|>`, improving the model’s understanding of text formatting and sentence structure, often crucial for structured input like formulas or tabular data.
-
-- The tokenizer also performs normalization, removing extraneous whitespace and fixing common number formatting issues (e.g., misplaced commas or dots), ensuring consistent tokenization.
-
----
-
-## Benefits
-
-- **Reduced vocabulary size:**  
-  By unifying all numeric forms under a single `<|num|>` token and separating case information via `<|cap|>`, the tokenizer avoids bloating the vocabulary with variants of numbers or capitalized words.
-
-- **Enhanced numeric and symbolic handling:**  
-  Specialized handling of numbers, dates, times, and math symbols enables better downstream performance on tasks involving mathematical reasoning, scientific text, or data with embedded numerics.
-
-- **Explicit preservation of formatting:**  
-  Introducing `<|space|>` tokens maintains the original input’s spacing, which helps models learn formatting cues and improves reconstruction quality.
-
-- **Improved detokenization fidelity:**  
-  Storing original numeric values allows exact reversal of tokenization, preserving precision and making the model’s output easier to interpret and trust.
-
-- **Modular and extendable:**  
-  The tokenizer’s design separates numeric processing from text tokenization, allowing for easier updates or adaptation to new numeric formats or domains.
-
----
-
-## Limitations and Challenges
-
-- **Complexity and performance:**  
-  The heavy use of regex matching and multi-step token insertion can slow tokenization compared to highly optimized byte-level tokenizers like standard GPT2. This can be a bottleneck for large-scale data preprocessing.
-
-- **Ambiguous or edge-case numeric formats:**  
-  Real-world data often includes ambiguous notations, OCR errors, or locale-dependent formats (e.g., decimal commas, varied date formats) that require continuous regex refinement or more advanced parsing.
-
-- **Not optimized for casual or conversational text:**  
-  The tokenizer’s strong focus on numeric and structured input means it might be less efficient or overly complex for pure natural language data without many numbers or symbols.
-
-- **Handling of capitalization is simplistic:**  
-  Only initial capitalization is tagged via `<|cap|>`, so words in all caps (acronyms) or mixed case are not distinctly handled, potentially losing some nuance.
-
-- **Serialization and batching challenges:**  
-  The separate `number_map` structure that stores original numeric values needs careful handling in batch processing and training pipelines to maintain alignment between tokens and numeric embeddings.
-
----
-
-## Potential Improvements
-
-- **Stepwise tokenization pipeline:**  
-  Splitting regex processing into stages (dates → times → hex → numbers) might improve clarity, maintainability, and speed.
-
-- **Selective `<|space|>` insertion:**  
-  Only add `<|space|>` where critical (e.g., between words) to reduce token overhead and simplify sequences.
-
-- **Extended capitalization tagging:**  
-  Introduce tags for ALL CAPS or mixed case to better capture acronyms and proper nouns.
-
-- **Advanced numeric parsing:**  
-  Integrate domain-specific numeric parsers or libraries (e.g., `dateutil`, `regex` Unicode features) to capture edge cases and locale variants.
-
-- **Embedding API unification:**  
-  Build an interface that cleanly merges textual embeddings from GPT2 tokens with numeric embeddings derived from stored numeric values, using cross-attention and alignment losses to fuse representations.
-
-- **Performance optimizations:**  
-  Consider reimplementing tokenization logic in faster languages (Rust/Cython) or leveraging HuggingFace’s `tokenizers` library for speed gains.
-
-- **Robust serialization:**  
-  Ensure the `number_map` and token sequences can be efficiently serialized and fed into training pipelines, especially when batching multiple sequences.
-
----
-
-## Summary
-
-Blackhole-LLM’s tokenizer represents an **innovative and principled approach** to bridging standard NLP tokenization with the specialized needs of numeric and mathematical text. Its core idea—separating numeric content from textual tokens via placeholder tokens and explicit capitalization and spacing marks—is a clever way to reduce vocabulary size while preserving crucial semantic details.
-
-However, this approach also **comes with trade-offs**: additional complexity, performance overhead, and the need for continuous regex tuning and data-specific adjustments. The tokenizer is most promising in domains requiring **precise mathematical or structured input understanding** but is less suited for generic natural language tasks without numeric density.
-
-In short: Blackhole-LLM’s tokenizer sets a solid foundation for **numerically-aware LLM tokenization**, but to unlock its full potential, it requires ongoing refinement in speed, robustness, and integration with dual embedding architectures that jointly model text and numbers.
-
----
+Further development and optimization of the main model architecture (NovaModel).
+Implementation and refinement of the complete LLM training process, utilizing dual embeddings.
+Adding advanced evaluation and prediction functionalities for the entire model.
+Integration with larger datasets and real-world NLP tasks.
+License
+This project is licensed under the MIT License.
