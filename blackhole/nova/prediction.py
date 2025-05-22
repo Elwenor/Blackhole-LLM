@@ -6,23 +6,6 @@ from blackhole.embedding import decode_number_from_features # Import your embedd
 
 def predict_and_decode_answer(model, encoder_token_ids, encoder_numeric_features,
                               encoder_attention_mask, vocab, device, max_decoding_len=128, padded_feat_row=None):
-    """
-    Generates and decodes answers from the model using greedy decoding.
-
-    Args:
-        model (torch.nn.Module): The trained model.
-        encoder_token_ids (torch.Tensor): Input token IDs for the encoder (Batch_size, Seq_len).
-        encoder_numeric_features (torch.Tensor): Input numerical features for the encoder (Batch_size, Seq_len, Feature_dim).
-        encoder_attention_mask (torch.Tensor): Attention mask for the encoder (Batch_size, Seq_len).
-        vocab (dict): The vocabulary mapping tokens to IDs.
-        device (torch.device): The device (CPU/GPU) for computations.
-        max_decoding_len (int): Maximum length of the generated sequence.
-        padded_feat_row (torch.Tensor, optional): A tensor representing padded numerical features.
-                                                   If None, it will be initialized.
-
-    Returns:
-        list: A list of decoded answer strings for each example in the batch.
-    """
     model.eval() # Set model to evaluation mode
 
     idx_to_token = {idx: token for token, idx in vocab.items()}
