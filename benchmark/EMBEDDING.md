@@ -12,7 +12,7 @@ This module is **not a standalone general-purpose embedding library**, but rathe
 
 ## 2\. Why Specialized Numerical Embeddings are Essential
 
-As highlighted in the [Blackhole-LLM Tokenizer README](https://www.google.com/search?q=link-do-tokenizer-readme), standard tokenizers often fail to preserve the intrinsic value and relationships of numbers. This creates a significant gap for LLMs attempting complex numerical tasks. The Blackhole-LLM Embedding Module addresses this by:
+As highlighted in the [Blackhole-LLM Tokenizer README](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/TOKENIZER.md), standard tokenizers often fail to preserve the intrinsic value and relationships of numbers. This creates a significant gap for LLMs attempting complex numerical tasks. The Blackhole-LLM Embedding Module addresses this by:
 
   * **Preserving Numerical Precision:** Instead of treating numbers as mere strings, our module creates embeddings that encode the exact floating-point value through a unique binary representation.
   * **Capturing Numerical Semantics:** It embeds properties like sign, order of magnitude (via bucket encoding), and type (integer, float, hexadecimal, date/time component), providing the model with a deeper understanding of the number's context and meaning.
