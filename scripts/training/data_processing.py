@@ -1,271 +1,217 @@
-import torch
+# File: data_processing.py (Excerpt - you will need to add this logic)
+
 import re
-from tqdm import tqdm
-from datasets import Dataset, Features, Value, Sequence
+from num2words import num2words
+import torch
+import numpy as np
+from datasets import Features, Value, Sequence
+import sys, os
 
-# Assuming blackhole.tokenizer and blackhole.embedding are correctly installed and accessible
-from blackhole.tokenizer import tokenize as blackhole_tokenize # Rename to avoid conflict
-from blackhole.embedding import number_embedding_features
-
-# Import special tokens from config
+# Assuming these are defined in your config.py or elsewhere
 from config import (
     PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN, NUM_TOKEN, SPECIAL_TOKENS
 )
 
-def preprocess_example(example, vocab, feature_embedding_dim, max_seq_len):
-    """
-    Preprocesses a single example for the Encoder-Decoder model.
-    Handles tokenization of both input question and target answer,
-    replacing numbers in the answer with <|num|> and storing their features.
-    Returns lists of lists for numeric features, to be converted to tensors in collate_fn.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-    Args:
-        example (dict): A dictionary with 'question' and 'answer' keys.
-        vocab (dict): Token to index mapping.
-        feature_embedding_dim (int): Dimension of numerical features.
-        max_seq_len (int): Maximum sequence length for padding/truncation.
+from blackhole.embedding import *
 
-    Returns:
-        dict: Processed data as Python lists (including lists of lists for numeric features).
-    """
-    pad_token_id = vocab.get(PAD_TOKEN, 0)
-    unk_token_id = vocab.get(UNK_TOKEN, 0)
-    num_token_id = vocab.get(NUM_TOKEN, unk_token_id)
-    bos_token_id = vocab.get(BOS_TOKEN, unk_token_id)
-    eos_token_id = vocab.get(EOS_TOKEN, unk_token_id)
-
-    # padded_feat_row should be a list of floats, not a tensor, since we want lists of lists
-    # Use a value that clearly indicates padding, e.g., -2.0, as Tanh output is [-1, 1]
-    padded_feat_row_list = [-2.0] * feature_embedding_dim
-
-    # --- Encoder Input Processing (Question) ---
-    enc_tokens, enc_number_map = blackhole_tokenize(example['question'])
-    enc_token_ids = [vocab.get(tok, unk_token_id) for tok in enc_tokens]
-    
-    _enc_numeric_features = [] # List of lists of floats
-    for token_idx in range(len(enc_token_ids)):
-        if token_idx in enc_number_map:
-            val, typ, raw = enc_number_map[token_idx]
-            # Convert the returned tensor from number_embedding_features to a list
-            _enc_numeric_features.append(number_embedding_features(val, typ, dim=feature_embedding_dim).tolist())
-        else:
-            _enc_numeric_features.append(padded_feat_row_list)
-
-    # --- Decoder Target Processing (Answer) ---
-    ans_tokens, ans_number_map = blackhole_tokenize(example['answer'])
-
-    _dec_target_token_ids = [bos_token_id]
-    _dec_target_numeric_features = [padded_feat_row_list] # List of lists of floats
-    _target_numerical_values_value = [float('nan')] # Padding for BOS
-    _target_numerical_values_type = ["padding"] # Padding for BOS
-    _target_numerical_values_raw_string = ["<pad_num>"] # Padding for BOS
-
-
-    for i, tok in enumerate(ans_tokens):
-        if i in ans_number_map:
-            val, typ, raw = ans_number_map[i]
-            _dec_target_token_ids.append(num_token_id)
-            # Convert the returned tensor from number_embedding_features to a list
-            _dec_target_numeric_features.append(number_embedding_features(val, typ, dim=feature_embedding_dim).tolist())
-            _target_numerical_values_value.append(float(val))
-            _target_numerical_values_type.append(str(typ))
-            _target_numerical_values_raw_string.append(str(raw))
-        else:
-            _dec_target_token_ids.append(vocab.get(tok, unk_token_id))
-            _dec_target_numeric_features.append(padded_feat_row_list)
-            _target_numerical_values_value.append(float('nan')) # Padding for text tokens
-            _target_numerical_values_type.append("padding")
-            _target_numerical_values_raw_string.append("<pad_num>")
-
-    _dec_target_token_ids.append(eos_token_id)
-    _dec_target_numeric_features.append(padded_feat_row_list)
-    _target_numerical_values_value.append(float('nan')) # Padding for EOS
-    _target_numerical_values_type.append("padding")
-    _target_numerical_values_raw_string.append("<pad_num>")
-
-    # Perform slicing for decoder input and output based on _dec_target_token_ids
-    decoder_input_token_ids = _dec_target_token_ids[:-1]
-    decoder_input_numeric_features = _dec_target_numeric_features[:-1] # This is a list of lists
-
-    decoder_output_token_targets = _dec_target_token_ids[1:]
-    decoder_output_numeric_targets = _dec_target_numeric_features[1:] # This is a list of lists
-
-    # Apply the same slicing to the numerical target lists
-    target_numerical_values_value = _target_numerical_values_value[1:]
-    target_numerical_values_type = _target_numerical_values_type[1:]
-    target_numerical_values_raw_string = _target_numerical_values_raw_string[1:]
-
-
-    # --- Padding and Truncation ---
-    # Encoder
-    enc_len = len(enc_token_ids)
-    enc_attention_mask = [False] * enc_len # False means not masked for PyTorch Transformer input_key_padding_mask
-    if enc_len > max_seq_len:
-        enc_token_ids = enc_token_ids[:max_seq_len]
-        _enc_numeric_features = _enc_numeric_features[:max_seq_len]
-        enc_attention_mask = enc_attention_mask[:max_seq_len]
-    else:
-        num_padding_needed_enc = max_seq_len - enc_len
-        enc_token_ids += [pad_token_id] * num_padding_needed_enc
-        _enc_numeric_features += [padded_feat_row_list] * num_padding_needed_enc
-        enc_attention_mask += [True] * num_padding_needed_enc # True means masked
-
-
-    # Decoder
-    dec_len_after_slicing = len(decoder_input_token_ids)
-    dec_attention_mask = [False] * dec_len_after_slicing # False means not masked
-
-    if dec_len_after_slicing > max_seq_len:
-        decoder_input_token_ids = decoder_input_token_ids[:max_seq_len]
-        decoder_input_numeric_features = decoder_input_numeric_features[:max_seq_len]
-        decoder_output_token_targets = decoder_output_token_targets[:max_seq_len]
-        decoder_output_numeric_targets = decoder_output_numeric_targets[:max_seq_len]
-        dec_attention_mask = dec_attention_mask[:max_seq_len]
-        target_numerical_values_value = target_numerical_values_value[:max_seq_len]
-        target_numerical_values_type = target_numerical_values_type[:max_seq_len]
-        target_numerical_values_raw_string = target_numerical_values_raw_string[:max_seq_len]
-    else:
-        num_padding_needed_dec = max_seq_len - dec_len_after_slicing
-        decoder_input_token_ids += [pad_token_id] * num_padding_needed_dec
-        decoder_input_numeric_features += [padded_feat_row_list] * num_padding_needed_dec
-        decoder_output_token_targets += [pad_token_id] * num_padding_needed_dec
-        decoder_output_numeric_targets += [padded_feat_row_list] * num_padding_needed_dec
-        dec_attention_mask += [True] * num_padding_needed_dec # True means masked
-
-        target_numerical_values_value.extend([float('nan')] * num_padding_needed_dec)
-        target_numerical_values_type.extend(["padding"] * num_padding_needed_dec)
-        target_numerical_values_raw_string.extend(["<pad_num>"] * num_padding_needed_dec)
-
-    # Assertions to ensure correct lengths
-    assert len(enc_token_ids) == max_seq_len, f"Encoder tokens length: {len(enc_token_ids)}, expected: {max_seq_len}"
-    assert len(_enc_numeric_features) == max_seq_len, f"Encoder numeric features length: {len(_enc_numeric_features)}, expected: {max_seq_len}"
-    assert all(len(f) == feature_embedding_dim for f in _enc_numeric_features), "Encoder numeric features inner list has wrong dimension"
-    assert len(enc_attention_mask) == max_seq_len, f"Encoder attention mask length: {len(enc_attention_mask)}, expected: {max_seq_len}"
-
-    assert len(decoder_input_token_ids) == max_seq_len, f"Decoder input tokens length: {len(decoder_input_token_ids)}, expected: {max_seq_len}"
-    assert len(decoder_input_numeric_features) == max_seq_len, f"Decoder input numeric features length: {len(decoder_input_numeric_features)}, expected: {max_seq_len}"
-    assert all(len(f) == feature_embedding_dim for f in decoder_input_numeric_features), "Decoder input numeric features inner list has wrong dimension"
-    assert len(decoder_output_token_targets) == max_seq_len, f"Decoder output token targets length: {len(decoder_output_token_targets)}, expected: {max_seq_len}"
-    assert len(decoder_output_numeric_targets) == max_seq_len, f"Decoder output numeric targets length: {len(decoder_output_numeric_targets)}, expected: {max_seq_len}"
-    assert all(len(f) == feature_embedding_dim for f in decoder_output_numeric_targets), "Decoder output numeric targets inner list has wrong dimension"
-    assert len(dec_attention_mask) == max_seq_len, f"Decoder attention mask length: {len(dec_attention_mask)}, expected: {max_seq_len}"
-
-    assert len(target_numerical_values_value) == max_seq_len, f"Numerical values (value) length: {len(target_numerical_values_value)}, expected: {max_seq_len}"
-    assert len(target_numerical_values_type) == max_seq_len, f"Numerical values (type) length: {len(target_numerical_values_type)}, expected: {max_seq_len}"
-    assert len(target_numerical_values_raw_string) == max_seq_len, f"Numerical values (raw_string) length: {len(target_numerical_values_raw_string)}, expected: {max_seq_len}"
-
-    return {
-        'encoder_token_ids': enc_token_ids, # List of ints
-        'encoder_numeric_features': _enc_numeric_features, # Now explicitly list of lists of floats
-        'encoder_attention_mask': enc_attention_mask, # List of bools
-        'decoder_input_token_ids': decoder_input_token_ids, # List of ints
-        'decoder_input_numeric_features': decoder_input_numeric_features, # Now explicitly list of lists of floats
-        'decoder_output_token_targets': decoder_output_token_targets, # List of ints
-        'decoder_output_numeric_targets': decoder_output_numeric_targets, # Now explicitly list of lists of floats
-        'decoder_attention_mask': dec_attention_mask, # List of bools
-        'target_numerical_values_value': target_numerical_values_value, # List of floats
-        'target_numerical_values_type': target_numerical_values_type, # List of strings
-        'target_numerical_values_raw_string': target_numerical_values_raw_string, # List of strings
-        'original_question': example['question'],
-        'original_answer': example['answer']
-    }
-
-def custom_collate_fn(batch_examples, vocab, feature_embedding_dim, max_seq_len):
-    """
-    Collate function to stack processed examples into a batch.
-    Converts lists from preprocess_example into tensors for batching.
-    """
-    enc_token_ids_batch = []
-    enc_numeric_features_batch = []
-    enc_attention_mask_batch = []
-    dec_input_token_ids_batch = []
-    dec_input_numeric_features_batch = []
-    dec_output_token_targets_batch = []
-    dec_output_numeric_targets_batch = []
-    dec_attention_mask_batch = []
-    original_question_strings_batch = []
-    original_answer_strings_batch = []
-
-    target_numerical_values_value_batch = []
-    target_numerical_values_type_batch = []
-    target_numerical_values_raw_string_batch = []
-
-
-    for ex in batch_examples:
-        # Convert lists to tensors and append for stacking
-        enc_token_ids_batch.append(torch.tensor(ex['encoder_token_ids'], dtype=torch.long))
-        # Now we expect ex['encoder_numeric_features'] to be a list of lists of floats
-        enc_numeric_features_batch.append(torch.tensor(ex['encoder_numeric_features'], dtype=torch.float32))
-        enc_attention_mask_batch.append(torch.tensor(ex['encoder_attention_mask'], dtype=torch.bool))
-
-        dec_input_token_ids_batch.append(torch.tensor(ex['decoder_input_token_ids'], dtype=torch.long))
-        dec_input_numeric_features_batch.append(torch.tensor(ex['decoder_input_numeric_features'], dtype=torch.float32))
-        dec_output_token_targets_batch.append(torch.tensor(ex['decoder_output_token_targets'], dtype=torch.long))
-        dec_output_numeric_targets_batch.append(torch.tensor(ex['decoder_output_numeric_targets'], dtype=torch.float32))
-        dec_attention_mask_batch.append(torch.tensor(ex['decoder_attention_mask'], dtype=torch.bool))
-
-        target_numerical_values_value_batch.append(ex['target_numerical_values_value'])
-        target_numerical_values_type_batch.append(ex['target_numerical_values_type'])
-        target_numerical_values_raw_string_batch.append(ex['target_numerical_values_raw_string'])
-
-        original_question_strings_batch.append(ex['original_question'])
-        original_answer_strings_batch.append(ex['original_answer'])
-
-    return {
-        'encoder_token_ids': torch.stack(enc_token_ids_batch),
-        'encoder_numeric_features': torch.stack(enc_numeric_features_batch),
-        'encoder_attention_mask': torch.stack(enc_attention_mask_batch),
-        'decoder_input_token_ids': torch.stack(dec_input_token_ids_batch),
-        'decoder_input_numeric_features': torch.stack(dec_input_numeric_features_batch),
-        'decoder_output_token_targets': torch.stack(dec_output_token_targets_batch),
-        'decoder_output_numeric_targets': torch.stack(dec_output_numeric_targets_batch),
-        'decoder_attention_mask': torch.stack(dec_attention_mask_batch),
-        'target_numerical_values_value': target_numerical_values_value_batch,
-        'target_numerical_values_type': target_numerical_values_type_batch,
-        'target_numerical_values_raw_string': target_numerical_values_raw_string_batch,
-        'original_question_strings': original_question_strings_batch,
-        'original_answer_strings': original_answer_strings_batch
-    }
-
-def build_vocab_from_dataset(dataset):
-    """
-    Builds vocabulary from a Hugging Face dataset.
-    Assumes dataset structure with 'question' and 'answer' keys.
-    """
-    all_tokens = set()
-    all_tokens.update(SPECIAL_TOKENS) # Use special tokens from config
-
-    # GSM8K has 'train' and 'test' splits
-    for split_name in ['train', 'test']:
-        if split_name in dataset:
-            for example in tqdm(dataset[split_name], desc=f"Building vocab from {split_name} split"):
-                q_tokens, _ = blackhole_tokenize(example['question']) # Use the correct tokenizer
-                all_tokens.update(q_tokens)
-
-                a_tokens, _ = blackhole_tokenize(example['answer']) # Use the correct tokenizer
-                all_tokens.update(a_tokens)
-
-    vocab = {tok: i for i, tok in enumerate(sorted(list(all_tokens)))}
-    return vocab
-
-def get_features_schema(feature_embedding_dim, max_seq_len):
-    """
-    Function to define the data schema for PyArrow.
-    Features schema should reflect what preprocess_example RETURNS,
-    which are Python lists of lists for numeric features.
-    """
+def get_features_schema(numeric_feature_dim, max_seq_len):
+    """Defines the features schema for the dataset."""
     return Features({
-        "encoder_token_ids": Sequence(Value("int64"), length=max_seq_len),
-        "encoder_numeric_features": Sequence(Sequence(Value("float32"), length=feature_embedding_dim), length=max_seq_len),
-        "encoder_attention_mask": Sequence(Value("bool"), length=max_seq_len),
-        "decoder_input_token_ids": Sequence(Value("int64"), length=max_seq_len),
-        "decoder_input_numeric_features": Sequence(Sequence(Value("float32"), length=feature_embedding_dim), length=max_seq_len),
-        "decoder_output_token_targets": Sequence(Value("int64"), length=max_seq_len),
-        "decoder_output_numeric_targets": Sequence(Sequence(Value("float32"), length=feature_embedding_dim), length=max_seq_len),
-        "decoder_attention_mask": Sequence(Value("bool"), length=max_seq_len),
-        "target_numerical_values_value": Sequence(Value("float64"), length=max_seq_len),
-        "target_numerical_values_type": Sequence(Value("string"), length=max_seq_len),
-        "target_numerical_values_raw_string": Sequence(Value("string"), length=max_seq_len),
-        "original_question": Value("string"),
-        "original_answer": Value("string")
+        'encoder_token_ids': Sequence(Value('int32'), length=max_seq_len),
+        'encoder_numeric_features': Sequence(Sequence(Value('float32'), length=numeric_feature_dim), length=max_seq_len),
+        'encoder_attention_mask': Sequence(Value('bool'), length=max_seq_len),
+        'decoder_input_token_ids': Sequence(Value('int32'), length=max_seq_len),
+        'decoder_input_numeric_features': Sequence(Sequence(Value('float32'), length=numeric_feature_dim), length=max_seq_len),
+        'decoder_output_token_targets': Sequence(Value('int32'), length=max_seq_len),
+        'decoder_output_numeric_targets': Sequence(Sequence(Value('float32'), length=numeric_feature_dim), length=max_seq_len),
+        'decoder_attention_mask': Sequence(Value('bool'), length=max_seq_len),
+        # ADD THESE TWO NEW FIELDS:
+        'original_answers_text': Value('string'), # To store the raw answer string
+        'original_numeric_values': Sequence(Value('float32')) # To store all numbers extracted from the answer
     })
+
+def preprocess_example(example, vocab, numeric_feature_dim, max_seq_len):
+    question = example['question']
+    answer = example['answer']
+
+    # --- Process Question (Encoder Input) ---
+    encoder_tokens, encoder_nums, encoder_num_types = tokenize_and_featurize_text(
+        question, NUM_TOKEN, PAD_TOKEN
+    )
+    encoder_token_ids = [vocab.get(token, vocab[UNK_TOKEN]) for token in encoder_tokens]
+    encoder_token_ids = [vocab[BOS_TOKEN]] + encoder_token_ids + [vocab[EOS_TOKEN]]
+    
+    encoder_numeric_features = [
+        number_embedding_features(val, typ) for val, typ in zip(encoder_nums, encoder_num_types)
+    ]
+    # Add padding for BOS/EOS tokens for numeric features (e.g., all zeros or a special "no number" embedding)
+    padded_feat_row = [0.0] * numeric_feature_dim # Or a specific padding value like -2.0
+    encoder_numeric_features = [padded_feat_row] + encoder_numeric_features + [padded_feat_row]
+
+    encoder_attention_mask = [True] * len(encoder_token_ids)
+
+    # Pad/truncate encoder inputs
+    encoder_token_ids, encoder_numeric_features, encoder_attention_mask = pad_sequence_for_model(
+        encoder_token_ids, encoder_numeric_features, encoder_attention_mask,
+        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=True
+    )
+
+    # --- Process Answer (Decoder Input/Output) ---
+    decoder_tokens, decoder_nums, decoder_num_types = tokenize_and_featurize_text(
+        answer, NUM_TOKEN, PAD_TOKEN
+    )
+    
+    # Decoder input: starts with BOS, then tokens from answer
+    decoder_input_token_ids = [vocab[BOS_TOKEN]] + [vocab.get(token, vocab[UNK_TOKEN]) for token in decoder_tokens]
+    
+    decoder_input_numeric_features = [padded_feat_row] + [ # BOS gets padding
+        number_embedding_features(val, typ) for val, typ in zip(decoder_nums, decoder_num_types)
+    ]
+
+    # Decoder output targets: tokens from answer, then EOS
+    decoder_output_token_targets = [vocab.get(token, vocab[UNK_TOKEN]) for token in decoder_tokens] + [vocab[EOS_TOKEN]]
+
+    decoder_output_numeric_targets = [
+        number_embedding_features(val, typ) for val, typ in zip(decoder_nums, decoder_num_types)
+    ] + [padded_feat_row] # EOS gets padding
+
+    decoder_attention_mask = [True] * len(decoder_input_token_ids) # Assuming it's `True` for valid tokens
+
+    # Pad/truncate decoder inputs/outputs
+    decoder_input_token_ids, decoder_input_numeric_features, decoder_attention_mask = pad_sequence_for_model(
+        decoder_input_token_ids, decoder_input_numeric_features, decoder_attention_mask,
+        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=False
+    )
+    decoder_output_token_targets, decoder_output_numeric_targets, _ = pad_sequence_for_model(
+        decoder_output_token_targets, decoder_output_numeric_targets, [True] * len(decoder_output_token_targets),
+        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=False
+    )
+    
+    # Extract all numbers from the original answer text
+    # This is the crucial part for 'original_numeric_values'
+    original_numbers_in_answer = [float(n) for n in re.findall(r'\d+\.?\d*', answer)]
+    if not original_numbers_in_answer:
+        original_numbers_in_answer = [0.0] # Ensure it's never empty, provide a default if no numbers are found
+
+    return {
+        'encoder_token_ids': encoder_token_ids,
+        'encoder_numeric_features': encoder_numeric_features,
+        'encoder_attention_mask': encoder_attention_mask,
+        'decoder_input_token_ids': decoder_input_token_ids,
+        'decoder_input_numeric_features': decoder_input_numeric_features,
+        'decoder_output_token_targets': decoder_output_token_targets,
+        'decoder_output_numeric_targets': decoder_output_numeric_targets,
+        'decoder_attention_mask': decoder_attention_mask,
+        'original_answers_text': answer, # Store the original answer text
+        'original_numeric_values': original_numbers_in_answer # Store the list of numbers from the original answer
+    }
+
+
+def custom_collate_fn(batch, vocab, numeric_feature_dim, max_seq_len):
+    # This function needs to handle the newly added 'original_answers_text' and 'original_numeric_values'
+    # It should stack them correctly.
+    
+    # Extract lists of all fields from the batch
+    encoder_token_ids_list = [item['encoder_token_ids'] for item in batch]
+    encoder_numeric_features_list = [item['encoder_numeric_features'] for item in batch]
+    encoder_attention_mask_list = [item['encoder_attention_mask'] for item in batch]
+    decoder_input_token_ids_list = [item['decoder_input_token_ids'] for item in batch]
+    decoder_input_numeric_features_list = [item['decoder_input_numeric_features'] for item in batch]
+    decoder_output_token_targets_list = [item['decoder_output_token_targets'] for item in batch]
+    decoder_output_numeric_targets_list = [item['decoder_output_numeric_targets'] for item in batch]
+    decoder_attention_mask_list = [item['decoder_attention_mask'] for item in batch]
+    
+    # NEW: Extract these lists
+    original_answers_text_list = [item['original_answers_text'] for item in batch]
+    original_numeric_values_list = [item['original_numeric_values'] for item in batch]
+
+    # Convert to tensors
+    padded_encoder_token_ids = torch.tensor(encoder_token_ids_list, dtype=torch.long)
+    padded_encoder_numeric_features = torch.tensor(encoder_numeric_features_list, dtype=torch.float32)
+    padded_encoder_attention_mask = torch.tensor(encoder_attention_mask_list, dtype=torch.bool)
+    padded_decoder_input_token_ids = torch.tensor(decoder_input_token_ids_list, dtype=torch.long)
+    padded_decoder_input_numeric_features = torch.tensor(decoder_input_numeric_features_list, dtype=torch.float32)
+    padded_decoder_output_token_targets = torch.tensor(decoder_output_token_targets_list, dtype=torch.long)
+    padded_decoder_output_numeric_targets = torch.tensor(decoder_output_numeric_targets_list, dtype=torch.float32)
+    padded_decoder_attention_mask = torch.tensor(decoder_attention_mask_list, dtype=torch.bool)
+
+    # For original_numeric_values, you might have variable lengths.
+    # You need to handle this. One common way is to pad them or store them as a list of lists.
+    # If `evaluate` expects a single tensor, you'll need a padding strategy.
+    # For now, let's keep them as a list of lists if `evaluate` can handle that,
+    # or pad them to max_seq_len if they're used in a vectorized way for numerical accuracy.
+    # Given the current `evaluate` function, it's looping through each item, so a list of lists is fine.
+    
+    # You might also want to store original_indices if you need to fetch from the raw dataset later
+    # original_indices = [item['original_index'] for item in batch] # If you added this in preprocess
+
+    return {
+        'encoder_token_ids': padded_encoder_token_ids,
+        'encoder_numeric_features': padded_encoder_numeric_features,
+        'encoder_attention_mask': padded_encoder_attention_mask,
+        'decoder_input_token_ids': padded_decoder_input_token_ids,
+        'decoder_input_numeric_features': padded_decoder_input_numeric_features,
+        'decoder_output_token_targets': padded_decoder_output_token_targets,
+        'decoder_output_numeric_targets': padded_decoder_output_numeric_targets,
+        'decoder_attention_mask': padded_decoder_attention_mask,
+        'original_answers_text': original_answers_text_list, # Pass as list of strings
+        'original_numeric_values': original_numeric_values_list, # Pass as list of lists of floats
+        # 'original_indices': original_indices, # If you added original_index in preprocess
+    }
+
+# Ensure `tokenize_and_featurize_text` and `pad_sequence_for_model` are correctly defined
+# in data_processing.py or imported from relevant modules.
+# Example of a simplified tokenize_and_featurize_text (you have your own, ensure it works with numbers)
+def tokenize_and_featurize_text(text, num_token, pad_token):
+    # This is a placeholder. Your actual implementation should extract numbers and tokens.
+    tokens = []
+    numbers = []
+    num_types = []
+    
+    # Replace numbers with <|num|> token and store the actual number
+    parts = re.split(r'(\d+\.?\d*)', text)
+    for part in parts:
+        if re.fullmatch(r'\d+\.?\d*', part):
+            tokens.append(num_token)
+            numbers.append(float(part))
+            num_types.append('float' if '.' in part else 'int')
+        elif part: # Process non-numeric parts
+            sub_tokens = re.findall(r"[\w']+|[.,!?;:]|\s+", part.lower())
+            for tok in sub_tokens:
+                if tok.isspace():
+                    if tokens and tokens[-1] != ' ': # Avoid multiple spaces
+                        tokens.append(' ')
+                else:
+                    tokens.append(tok)
+            # Add dummy numbers and types for non-numeric tokens
+            numbers.extend([0.0] * len([t for t in sub_tokens if not t.isspace()]))
+            num_types.extend(['float'] * len([t for t in sub_tokens if not t.isspace()]))
+    
+    return tokens, numbers, num_types
+
+def pad_sequence_for_model(token_ids, numeric_features, attention_mask, max_len, pad_id, padded_feat_row, is_encoder=True):
+    # This is a placeholder. Your actual implementation.
+    current_len = len(token_ids)
+    
+    if current_len > max_len:
+        if is_encoder: # Truncate from the end
+            token_ids = token_ids[:max_len]
+            numeric_features = numeric_features[:max_len]
+            attention_mask = attention_mask[:max_len]
+        else: # Truncate from the end for decoder as well, but be careful with EOS
+            token_ids = token_ids[:max_len]
+            numeric_features = numeric_features[:max_len]
+            attention_mask = attention_mask[:max_len]
+            # Ensure EOS is at max_len if it was there and got truncated
+            if token_ids[-1] != pad_id and token_ids[-1] != vocab.get(EOS_TOKEN):
+                # Optionally replace last token with EOS if it was truncated, but keep logic simple for now
+                pass 
+    elif current_len < max_len:
+        padding_len = max_len - current_len
+        token_ids.extend([pad_id] * padding_len)
+        numeric_features.extend([padded_feat_row] * padding_len)
+        attention_mask.extend([False] * padding_len) # False for masked (padded) tokens
+
+    return token_ids, numeric_features, attention_mask

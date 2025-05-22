@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
 import numpy as np
-from num2words import num2words # Not directly used in this script but good to have if needed for number processing
+from num2words import num2words
 import re
 
 # Hugging Face datasets and transformers
@@ -18,43 +18,36 @@ from torch.utils.data import DataLoader
 
 # Set base_dir for blackhole imports
 try:
+    # Corrected path: '..', '..' to go from 'scripts/training' to 'Blackhole-LLM'
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..', '..'))
 except NameError:
     base_dir = os.path.abspath(os.path.join(os.getcwd(), '..', '..'))
-sys.path.insert(0, base_dir) # Correctly inserts base_dir into sys.path
+sys.path.insert(0, base_dir)
 
-# Set seeds for reproducibility from config
-from scripts.training.config import RANDOM_SEED # Adjusted import path for config
+# Set seeds for reproducibility from config (local import)
+from config import RANDOM_SEED
 torch.manual_seed(RANDOM_SEED)
 random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
 
-# Import modularized components
-from scripts.training.config import ( # Adjusted import paths
+# Import modularized components (local imports from scripts/training)
+from config import (
     TOKEN_DIM, NUM_DIM, HIDDEN_DIM, ENCODER_LAYERS, DECODER_LAYERS, DROPOUT,
     MAX_SEQ_LEN, NUM_EPOCHS, BATCH_SIZE, LEARNING_RATE,
     DATA_SAMPLE_PERCENTAGE, EVAL_SAMPLE_PERCENTAGE, NUM_EXAMPLES_TO_DISPLAY,
     PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN, NUM_TOKEN, SPECIAL_TOKENS
 )
-# Using '*' for import here can lead to naming conflicts, but if you're sure
-# there are no conflicts, it's fine for brevity as requested.
-from scripts.training.model import *
-from scripts.training.data_processing import *
-from scripts.training.inference import *
+from model import *
+from data_processing import *
+from inference import * # Assuming predict_and_decode_answer is here or handled internally by evaluate
 
-# Import from your blackhole modules
-# Ensure blackhole.embedding is correctly imported and available
+# Import from your blackhole modules (explicit imports)
 from blackhole.embedding import *
-import blackhole.embedding # For debugging path
+import blackhole.embedding
 print(f"DEBUG: Załadowano embedding.py z: {blackhole.embedding.__file__}")
 
-# Import training and evaluation functions from nova.py
-# Assuming these are indeed in blackhole.nova or its submodules
-# Let's assume train_step is in blackhole.nova.training and evaluate is in blackhole.nova.prediction
-# And loss functions are in blackhole.nova.loss_functions
-from blackhole.nova.training import train_step
-from blackhole.nova.prediction import evaluate
-from blackhole.nova.loss_functions import focal_loss, mse_loss_for_numerical_features
+# Explicitly import functions from blackhole.nova submodules
+from blackhole.nova import *
 
 
 def load_and_prepare_datasets(data_sample_perc, eval_sample_perc, max_seq_len):
@@ -165,13 +158,11 @@ if __name__ == '__main__':
     ).to(device)
 
     print("Preprocessing datasets with Hugging Face map...")
-    # Apply preprocessing to entire datasets using .map() for efficiency
-    # This creates new datasets with the preprocessed columns
     processed_train_dataset = train_dataset.map(
         lambda ex: preprocess_example(ex, vocab, determined_numeric_feature_dim, MAX_SEQ_LEN),
-        batched=False, # Process one example at a time
-        remove_columns=train_dataset.column_names, # Remove original columns
-        features=features_schema # Apply the defined schema
+        batched=False,
+        remove_columns=train_dataset.column_names,
+        features=features_schema
     )
     processed_val_dataset = val_dataset_for_evaluation.map(
         lambda ex: preprocess_example(ex, vocab, determined_numeric_feature_dim, MAX_SEQ_LEN),
@@ -191,7 +182,7 @@ if __name__ == '__main__':
     )
     eval_dataloader = DataLoader(
         processed_val_dataset,
-        batch_size=BATCH_SIZE, # Can use a larger batch size for eval if memory permits
+        batch_size=BATCH_SIZE,
         shuffle=False,
         collate_fn=lambda b: custom_collate_fn(b, vocab, determined_numeric_feature_dim, MAX_SEQ_LEN)
     )
@@ -199,7 +190,6 @@ if __name__ == '__main__':
     print("Initializing optimizer and scheduler...")
     optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE)
     
-    # Calculate num_training_steps correctly
     num_training_steps = NUM_EPOCHS * len(train_dataloader)
     lr_scheduler = get_scheduler(
         name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
@@ -209,23 +199,27 @@ if __name__ == '__main__':
     for epoch in range(NUM_EPOCHS):
         print(f"\n--- Epoch {epoch+1}/{NUM_EPOCHS} ---")
         
-        # Training step
-        train_loss = train_step(model, train_dataloader, optimizer, lr_scheduler, focal_loss, mse_loss_for_numerical_features, device)
+        model.train() # Set model to training mode
+        total_train_loss = 0
+        # Iterate over batches from train_dataloader
+        for batch in tqdm(train_dataloader, desc=f"Training Epoch {epoch+1}"):
+            # Pass individual batch to train_step, along with vocab and device
+            batch_loss_dict = train_step(model, batch, optimizer, lr_scheduler, focal_loss, mse_loss_for_numerical_features, vocab, device)
+            total_train_loss += batch_loss_dict['total_loss']
+
+        train_loss = total_train_loss / len(train_dataloader)
         print(f"Epoch {epoch+1} Training Loss: {train_loss:.4f}")
 
         # Evaluation step
-        val_metrics, sample_outputs = evaluate(
-            model, eval_dataloader, focal_loss, mse_loss_for_numerical_features, vocab, device,
-            num_examples_to_display=NUM_EXAMPLES_TO_DISPLAY # Pass the config value
+        model.eval() # Set model to evaluation mode
+        val_exact_acc, val_numerical_acc = evaluate(
+            model, processed_val_dataset, vocab, device,
+            batch_size=BATCH_SIZE,
+            max_decoding_len=MAX_SEQ_LEN,
+            collate_fn=lambda b: custom_collate_fn(b, vocab, determined_numeric_feature_dim, MAX_SEQ_LEN)
         )
-        print(f"Epoch {epoch+1} Validation Metrics: {val_metrics}")
+        print(f"Epoch {epoch+1} Validation Exact Match: {val_exact_acc:.4f}, Numerical Accuracy: {val_numerical_acc:.4f}")
 
-        print("\n--- Sample Predictions ---")
-        for i, sample in enumerate(sample_outputs):
-            if i >= NUM_EXAMPLES_TO_DISPLAY:
-                break # Ensure we don't display more than configured
-            print(f"Question: {sample['original_question']}")
-            print(f"Ground Truth: {sample['original_answer']}")
-            print(f"Prediction: {sample['predicted_answer']}\n")
+        print("\n--- Sample Predictions (Run inference separately if needed) ---")
 
     print("Training complete!")
