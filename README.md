@@ -44,9 +44,9 @@ My Blackhole-LLM project consists of several key packages and scripts that colle
       * **BlackholeTokenizer**: Currently, there are two versions of the tokenizer.
           * The **local version** is maintained for isolated development and testing.
           * The **Hugging Face integrated version (`PreTrainedTokenizerFast`)** is the primary focus of ongoing development and will be the officially supported version for future integrations.
-      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://www.google.com/search?q=https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/TOKENIZER.md)
+      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/TOKENIZER.md)
   * **`blackhole/embedding/`**: These modules are responsible for creating embeddings, including my advanced system for numerical data that transforms numbers into vectors understandable by the model.
-      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://www.google.com/search?q=https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
+      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
   * **`blackhole/nova/`**: This is the designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
   * **`scripts/`**: This directory contains various scripts for project management, including:
       * Unit tests (`scripts/tests/`).
