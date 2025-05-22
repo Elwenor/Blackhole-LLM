@@ -12,23 +12,6 @@ from .loss_functions import focal_loss, mse_loss_for_numerical_features
 # from blackhole.nova.prediction import predict_and_decode_answer 
 
 def train_step(model, batch, optimizer, scheduler, focal_loss_fn, mse_loss_fn, vocab, device, clip_grad=1.0):
-    """
-    Performs one training step for the model.
-
-    Args:
-        model (torch.nn.Module): The model to train.
-        batch (dict): A dictionary containing input and target tensors for the batch.
-        optimizer (torch.optim.Optimizer): The optimizer for model parameters.
-        scheduler (torch.optim.lr_scheduler._LRScheduler, optional): Learning rate scheduler.
-        focal_loss_fn (callable): The focal loss function (passed as an argument).
-        mse_loss_fn (callable): The MSE loss function for numerical features (passed as an argument).
-        vocab (dict): The vocabulary mapping tokens to IDs.
-        device (torch.device): The device (CPU/GPU) to perform computations on.
-        clip_grad (float): Maximum gradient norm for gradient clipping.
-
-    Returns:
-        dict: A dictionary containing the computed losses for the step.
-    """
     model.train()
 
     # Move batch tensors to the specified device
