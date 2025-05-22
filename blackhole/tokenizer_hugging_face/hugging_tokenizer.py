@@ -26,7 +26,7 @@ CUSTOM_SPECIAL_TOKENS = {
     "all_caps_token": ALL_CAPS_TOKEN
 }
 
-class MyCustomTokenizer(PreTrainedTokenizerFast):
+class BlackholeTokenizer(PreTrainedTokenizerFast):
     vocab_files_names = {"vocab_file": "vocab.json", "tokenizer_file": "tokenizer.json"}
     model_input_names = ["input_ids", "attention_mask"]
 

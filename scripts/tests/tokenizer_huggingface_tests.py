@@ -2,11 +2,9 @@ import sys, os
 import torch
 from typing import List, Dict, Any, Tuple, Optional, Union, Iterator
 
-# Dodaj katalog zawierający hugging_tokenizer.py do ścieżki Pythona
-# Zakładamy, że ten skrypt jest w tym samym katalogu co hugging_tokenizer.py
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from hugging_tokenizer import MyCustomTokenizer # Zaktualizowana klasa MyCustomTokenizer
+from blackhole.tokenizer_hugging_face import BlackholeTokenizer 
 
 import tokenizers
 print(f"Tokenizers version: {tokenizers.__version__}")
@@ -14,10 +12,6 @@ print(f"Tokenizers version: {tokenizers.__version__}")
 def print_test_results(title, original_text, encoded_input, decoded_with_special, decoded_clean, tokenizer_obj):
     """Pomocnicza funkcja do drukowania wyników testów w czytelny sposób."""
     
-    # encoded_input to BatchEncoding, wyciągnij pierwszy element dla testów pojedynczych
-    # input_ids i attention_mask mogą być tensorami lub listami list
-    
-    # Upewnij się, że input_ids_list jest zawsze płaską listą liczb całkowitych
     if isinstance(encoded_input['input_ids'], torch.Tensor):
         # Jeśli to tensor, konwertuj na listę. Jeśli to partia, weź pierwszy element.
         if encoded_input['input_ids'].ndim > 1:
@@ -108,7 +102,7 @@ def print_test_results(title, original_text, encoded_input, decoded_with_special
         print(f"MATCH: Original and decoded text (clean) are identical.")
 
 if __name__ == "__main__":
-    tokenizer = MyCustomTokenizer()
+    tokenizer = BlackholeTokenizer()
 
     texts_for_training = [
         "Hello world! This is a test. The number is 123.45 and also 0xabc.",
@@ -145,7 +139,7 @@ if __name__ == "__main__":
     tokenizer.save_pretrained(output_dir)
     print(f"Tokenizer saved to {output_dir}")
 
-    loaded_tokenizer = MyCustomTokenizer.from_pretrained(output_dir)
+    loaded_tokenizer = BlackholeTokenizer.from_pretrained(output_dir)
     print(f"Tokenizer loaded from {output_dir}")
 
     # --- Test 1: Standard Text with Numbers and Caps ---

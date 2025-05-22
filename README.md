@@ -1,6 +1,12 @@
-# Blackhole-LLM: An Innovative Architecture for Next-Generation LLMs
+# Blackhole-LLM: A Groundbreaking Architecture for Next-Generation LLMs
 
-Blackhole-LLM is my experimental Python project focused on **developing and refining an advanced architecture for Large Language Models (LLMs)**. Leveraging `PyTorch`, my work aims to revolutionize how both **textual and numerical data** are processed, with a strong emphasis on mathematical reasoning, structured input handling, and the overall modularity of the entire system.
+Welcome to **Blackhole-LLM** – my experimental venture into the realm of **advanced Large Language Model (LLM) architectures**\! Built upon `PyTorch`, this project aims to revolutionize how LLMs process both **textual and numerical data**, with a strong emphasis on robust mathematical reasoning, intelligent handling of structured inputs, and an overarching commitment to system modularity.
+
+-----
+
+### **A Future on Hugging Face: Our Integration Vision**
+
+From its inception, Blackhole-LLM is being developed with a clear goal: **to seamlessly integrate all its innovative components, including our custom tokenizer and numerical embedding modules, directly into the Hugging Face ecosystem.** This commitment ensures broad accessibility, ease of use, and a valuable contribution to the open-source community, while laying the groundwork for the next generation of powerful LLMs.
 
 -----
 
@@ -22,7 +28,7 @@ Blackhole-LLM is my experimental Python project focused on **developing and refi
 
 My Blackhole-LLM architecture stands out with the following innovations:
 
-  * **Innovative Tokenizer**: A custom extension of `GPT2TokenizerFast`, designed for efficient handling of numerical data, mathematical symbols, and structured input. It focuses on reducing vocabulary size while preserving semantic precision.
+  * **Innovative Tokenizer (BlackholeTokenizer)**: A custom extension of `PreTrainedTokenizerFast`, designed for efficient handling of numerical data, mathematical symbols, and structured input. It focuses on reducing vocabulary size while preserving semantic precision.
   * **Dual Embedding Architecture**: A unique approach to data embedding that combines traditional textual embeddings with advanced numerical embeddings. This allows the model to gain a deeper understanding of both linguistic and quantitative contexts.
   * **Modular Design**: The project is designed as a collection of independent yet closely integrated modules (`tokenizer`, `embedding`, `nova`), facilitating development, testing, and future expansion.
   * **Focus on Numerical Data and Mathematics**: The architecture is optimized from the ground up for processing numerical data, making it ideal for applications requiring precise mathematical reasoning.
@@ -35,9 +41,12 @@ My Blackhole-LLM architecture stands out with the following innovations:
 My Blackhole-LLM project consists of several key packages and scripts that collectively build its architecture:
 
   * **`blackhole/tokenizer/`**: This directory contains my innovative tokenizer, responsible for text processing, recognition, and special handling of numerical data, symbols, and formatting.
-      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/TOKENIZER.md)
+      * **BlackholeTokenizer**: Currently, there are two versions of the tokenizer.
+          * The **local version** is maintained for isolated development and testing.
+          * The **Hugging Face integrated version (`PreTrainedTokenizerFast`)** is the primary focus of ongoing development and will be the officially supported version for future integrations.
+      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://www.google.com/search?q=https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/TOKENIZER.md)
   * **`blackhole/embedding/`**: These modules are responsible for creating embeddings, including my advanced system for numerical data that transforms numbers into vectors understandable by the model.
-      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
+      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://www.google.com/search?q=https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
   * **`blackhole/nova/`**: This is the designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
   * **`scripts/`**: This directory contains various scripts for project management, including:
       * Unit tests (`scripts/tests/`).
@@ -64,3 +73,5 @@ This project is licensed under the [MIT License](https://www.google.com/search?q
 -----
 
 💡 **Note**: As an architectural project focused on innovation, there are no immediate installation or execution instructions provided in this `README.md`. The detailed design and benchmark results for the tokenizer and embeddings are available in their respective documentation files.
+
+-----
