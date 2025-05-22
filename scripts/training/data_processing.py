@@ -1,4 +1,4 @@
-# File: data_processing.py (Excerpt - you will need to add this logic)
+# File: data_processing.py
 
 import re
 from num2words import num2words
@@ -6,10 +6,11 @@ import torch
 import numpy as np
 from datasets import Features, Value, Sequence
 import sys, os
+from collections import Counter
 
-# Assuming these are defined in your config.py or elsewhere
 from config import (
-    PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN, NUM_TOKEN, SPECIAL_TOKENS
+    PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN, NUM_TOKEN, SPECIAL_TOKENS,
+    CAP_TOKEN, ALLCAPS_TOKEN, SPACE_TOKEN
 )
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -27,14 +28,75 @@ def get_features_schema(numeric_feature_dim, max_seq_len):
         'decoder_output_token_targets': Sequence(Value('int32'), length=max_seq_len),
         'decoder_output_numeric_targets': Sequence(Sequence(Value('float32'), length=numeric_feature_dim), length=max_seq_len),
         'decoder_attention_mask': Sequence(Value('bool'), length=max_seq_len),
-        # ADD THESE TWO NEW FIELDS:
-        'original_answers_text': Value('string'), # To store the raw answer string
-        'original_numeric_values': Sequence(Value('float32')) # To store all numbers extracted from the answer
+        'original_answers_text': Value('string'),
+        'original_numeric_values': Sequence(Value('float32'))
     })
+
+def basic_tokenize(text):
+    tokens = re.findall(r"[\w']+|[.,!?;:()]|\s+", text.lower())
+    final_tokens = []
+    for tok in tokens:
+        if tok.isspace():
+            if final_tokens and final_tokens[-1] != SPACE_TOKEN:
+                final_tokens.append(SPACE_TOKEN)
+        elif re.fullmatch(r'\d+\.?\d*', tok):
+            final_tokens.append(NUM_TOKEN)
+        elif tok in [CAP_TOKEN.lower(), ALLCAPS_TOKEN.lower()]:
+             final_tokens.append(tok)
+        else:
+            final_tokens.append(tok)
+            
+    if final_tokens and final_tokens[0] == SPACE_TOKEN:
+        final_tokens = final_tokens[1:]
+    if final_tokens and final_tokens[-1] == SPACE_TOKEN:
+        final_tokens = final_tokens[:-1]
+
+    return final_tokens
+
+def build_vocab_from_dataset(dataset_dict):
+    token_counts = Counter()
+    for split_name in dataset_dict:
+        current_dataset = dataset_dict[split_name]
+        for example in current_dataset:
+            question = example.get('question', '')
+            answer = example.get('answer', '')
+            if question:
+                tokens = basic_tokenize(question)
+                token_counts.update(tokens)
+            if answer:
+                tokens = basic_tokenize(answer)
+                token_counts.update(tokens)
+
+    vocab = {
+        PAD_TOKEN: 0,
+        UNK_TOKEN: 1,
+        BOS_TOKEN: 2,
+        EOS_TOKEN: 3,
+        NUM_TOKEN: 4,
+    }
+    
+    next_id = len(vocab)
+    for token in SPECIAL_TOKENS:
+        token_to_check = token.lower() if token in [CAP_TOKEN, ALLCAPS_TOKEN] else token 
+        if token_to_check not in vocab:
+            vocab[token_to_check] = next_id
+            next_id += 1
+
+    for token, count in token_counts.most_common():
+        if token not in vocab:
+            vocab[token] = next_id
+            next_id += 1
+            
+    return vocab
+
 
 def preprocess_example(example, vocab, numeric_feature_dim, max_seq_len):
     question = example['question']
     answer = example['answer']
+
+    # Ensure padded_feat_row is a plain list of floats, correctly sized
+    # This is critical for matching the schema's fixed length
+    padded_feat_row = [0.0] * numeric_feature_dim 
 
     # --- Process Question (Encoder Input) ---
     encoder_tokens, encoder_nums, encoder_num_types = tokenize_and_featurize_text(
@@ -43,19 +105,22 @@ def preprocess_example(example, vocab, numeric_feature_dim, max_seq_len):
     encoder_token_ids = [vocab.get(token, vocab[UNK_TOKEN]) for token in encoder_tokens]
     encoder_token_ids = [vocab[BOS_TOKEN]] + encoder_token_ids + [vocab[EOS_TOKEN]]
     
+    # Ensure numeric_features are lists of lists of float32
     encoder_numeric_features = [
-        number_embedding_features(val, typ) for val, typ in zip(encoder_nums, encoder_num_types)
+        # Explicitly convert to list and then to float for each element
+        [float(val) for val in number_embedding_features(n_val, n_typ)]
+        for n_val, n_typ in zip(encoder_nums, encoder_num_types)
     ]
-    # Add padding for BOS/EOS tokens for numeric features (e.g., all zeros or a special "no number" embedding)
-    padded_feat_row = [0.0] * numeric_feature_dim # Or a specific padding value like -2.0
-    encoder_numeric_features = [padded_feat_row] + encoder_numeric_features + [padded_feat_row]
+
+    # Add padding for BOS/EOS tokens for numeric features
+    encoder_numeric_features = [list(padded_feat_row)] + encoder_numeric_features + [list(padded_feat_row)]
 
     encoder_attention_mask = [True] * len(encoder_token_ids)
 
     # Pad/truncate encoder inputs
     encoder_token_ids, encoder_numeric_features, encoder_attention_mask = pad_sequence_for_model(
         encoder_token_ids, encoder_numeric_features, encoder_attention_mask,
-        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=True
+        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=True, vocab=vocab
     )
 
     # --- Process Answer (Decoder Input/Output) ---
@@ -66,34 +131,34 @@ def preprocess_example(example, vocab, numeric_feature_dim, max_seq_len):
     # Decoder input: starts with BOS, then tokens from answer
     decoder_input_token_ids = [vocab[BOS_TOKEN]] + [vocab.get(token, vocab[UNK_TOKEN]) for token in decoder_tokens]
     
-    decoder_input_numeric_features = [padded_feat_row] + [ # BOS gets padding
-        number_embedding_features(val, typ) for val, typ in zip(decoder_nums, decoder_num_types)
+    decoder_input_numeric_features = [list(padded_feat_row)] + [
+        [float(val) for val in number_embedding_features(n_val, n_typ)]
+        for n_val, n_typ in zip(decoder_nums, decoder_num_types)
     ]
 
     # Decoder output targets: tokens from answer, then EOS
     decoder_output_token_targets = [vocab.get(token, vocab[UNK_TOKEN]) for token in decoder_tokens] + [vocab[EOS_TOKEN]]
 
     decoder_output_numeric_targets = [
-        number_embedding_features(val, typ) for val, typ in zip(decoder_nums, decoder_num_types)
-    ] + [padded_feat_row] # EOS gets padding
+        [float(val) for val in number_embedding_features(n_val, n_typ)]
+        for n_val, n_typ in zip(decoder_nums, decoder_num_types)
+    ] + [list(padded_feat_row)]
 
-    decoder_attention_mask = [True] * len(decoder_input_token_ids) # Assuming it's `True` for valid tokens
+    decoder_attention_mask = [True] * len(decoder_input_token_ids)
 
     # Pad/truncate decoder inputs/outputs
     decoder_input_token_ids, decoder_input_numeric_features, decoder_attention_mask = pad_sequence_for_model(
         decoder_input_token_ids, decoder_input_numeric_features, decoder_attention_mask,
-        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=False
+        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=False, vocab=vocab
     )
     decoder_output_token_targets, decoder_output_numeric_targets, _ = pad_sequence_for_model(
         decoder_output_token_targets, decoder_output_numeric_targets, [True] * len(decoder_output_token_targets),
-        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=False
+        max_seq_len, vocab[PAD_TOKEN], padded_feat_row, is_encoder=False, vocab=vocab
     )
     
-    # Extract all numbers from the original answer text
-    # This is the crucial part for 'original_numeric_values'
     original_numbers_in_answer = [float(n) for n in re.findall(r'\d+\.?\d*', answer)]
     if not original_numbers_in_answer:
-        original_numbers_in_answer = [0.0] # Ensure it's never empty, provide a default if no numbers are found
+        original_numbers_in_answer = [0.0]
 
     return {
         'encoder_token_ids': encoder_token_ids,
@@ -104,16 +169,12 @@ def preprocess_example(example, vocab, numeric_feature_dim, max_seq_len):
         'decoder_output_token_targets': decoder_output_token_targets,
         'decoder_output_numeric_targets': decoder_output_numeric_targets,
         'decoder_attention_mask': decoder_attention_mask,
-        'original_answers_text': answer, # Store the original answer text
-        'original_numeric_values': original_numbers_in_answer # Store the list of numbers from the original answer
+        'original_answers_text': answer,
+        'original_numeric_values': original_numbers_in_answer
     }
 
 
 def custom_collate_fn(batch, vocab, numeric_feature_dim, max_seq_len):
-    # This function needs to handle the newly added 'original_answers_text' and 'original_numeric_values'
-    # It should stack them correctly.
-    
-    # Extract lists of all fields from the batch
     encoder_token_ids_list = [item['encoder_token_ids'] for item in batch]
     encoder_numeric_features_list = [item['encoder_numeric_features'] for item in batch]
     encoder_attention_mask_list = [item['encoder_attention_mask'] for item in batch]
@@ -123,7 +184,6 @@ def custom_collate_fn(batch, vocab, numeric_feature_dim, max_seq_len):
     decoder_output_numeric_targets_list = [item['decoder_output_numeric_targets'] for item in batch]
     decoder_attention_mask_list = [item['decoder_attention_mask'] for item in batch]
     
-    # NEW: Extract these lists
     original_answers_text_list = [item['original_answers_text'] for item in batch]
     original_numeric_values_list = [item['original_numeric_values'] for item in batch]
 
@@ -137,16 +197,6 @@ def custom_collate_fn(batch, vocab, numeric_feature_dim, max_seq_len):
     padded_decoder_output_numeric_targets = torch.tensor(decoder_output_numeric_targets_list, dtype=torch.float32)
     padded_decoder_attention_mask = torch.tensor(decoder_attention_mask_list, dtype=torch.bool)
 
-    # For original_numeric_values, you might have variable lengths.
-    # You need to handle this. One common way is to pad them or store them as a list of lists.
-    # If `evaluate` expects a single tensor, you'll need a padding strategy.
-    # For now, let's keep them as a list of lists if `evaluate` can handle that,
-    # or pad them to max_seq_len if they're used in a vectorized way for numerical accuracy.
-    # Given the current `evaluate` function, it's looping through each item, so a list of lists is fine.
-    
-    # You might also want to store original_indices if you need to fetch from the raw dataset later
-    # original_indices = [item['original_index'] for item in batch] # If you added this in preprocess
-
     return {
         'encoder_token_ids': padded_encoder_token_ids,
         'encoder_numeric_features': padded_encoder_numeric_features,
@@ -156,62 +206,78 @@ def custom_collate_fn(batch, vocab, numeric_feature_dim, max_seq_len):
         'decoder_output_token_targets': padded_decoder_output_token_targets,
         'decoder_output_numeric_targets': padded_decoder_output_numeric_targets,
         'decoder_attention_mask': padded_decoder_attention_mask,
-        'original_answers_text': original_answers_text_list, # Pass as list of strings
-        'original_numeric_values': original_numeric_values_list, # Pass as list of lists of floats
-        # 'original_indices': original_indices, # If you added original_index in preprocess
+        'original_answers_text': original_answers_text_list,
+        'original_numeric_values': original_numeric_values_list,
     }
 
-# Ensure `tokenize_and_featurize_text` and `pad_sequence_for_model` are correctly defined
-# in data_processing.py or imported from relevant modules.
-# Example of a simplified tokenize_and_featurize_text (you have your own, ensure it works with numbers)
 def tokenize_and_featurize_text(text, num_token, pad_token):
-    # This is a placeholder. Your actual implementation should extract numbers and tokens.
     tokens = []
     numbers = []
     num_types = []
     
-    # Replace numbers with <|num|> token and store the actual number
     parts = re.split(r'(\d+\.?\d*)', text)
     for part in parts:
         if re.fullmatch(r'\d+\.?\d*', part):
             tokens.append(num_token)
             numbers.append(float(part))
             num_types.append('float' if '.' in part else 'int')
-        elif part: # Process non-numeric parts
-            sub_tokens = re.findall(r"[\w']+|[.,!?;:]|\s+", part.lower())
+        elif part:
+            sub_tokens = re.findall(r"[\w']+|[.,!?;:()]|\s+", part.lower())
             for tok in sub_tokens:
                 if tok.isspace():
-                    if tokens and tokens[-1] != ' ': # Avoid multiple spaces
-                        tokens.append(' ')
+                    if tokens and tokens[-1] != SPACE_TOKEN:
+                        tokens.append(SPACE_TOKEN)
                 else:
                     tokens.append(tok)
-            # Add dummy numbers and types for non-numeric tokens
-            numbers.extend([0.0] * len([t for t in sub_tokens if not t.isspace()]))
-            num_types.extend(['float'] * len([t for t in sub_tokens if not t.isspace()]))
+            non_space_tokens_count = len([t for t in sub_tokens if not t.isspace()])
+            numbers.extend([0.0] * non_space_tokens_count)
+            num_types.extend(['float'] * non_space_tokens_count)
     
     return tokens, numbers, num_types
 
-def pad_sequence_for_model(token_ids, numeric_features, attention_mask, max_len, pad_id, padded_feat_row, is_encoder=True):
-    # This is a placeholder. Your actual implementation.
+def pad_sequence_for_model(token_ids, numeric_features, attention_mask, max_len, pad_id, padded_feat_row, is_encoder=True, vocab=None):
+    if vocab is None:
+        raise ValueError("vocab must be provided to pad_sequence_for_model")
+
     current_len = len(token_ids)
     
+    # Ensure copies to prevent unexpected side effects
+    token_ids_padded = list(token_ids)
+    numeric_features_padded = [list(f) for f in numeric_features] # Deep copy for inner lists
+    attention_mask_padded = list(attention_mask)
+
     if current_len > max_len:
-        if is_encoder: # Truncate from the end
-            token_ids = token_ids[:max_len]
-            numeric_features = numeric_features[:max_len]
-            attention_mask = attention_mask[:max_len]
-        else: # Truncate from the end for decoder as well, but be careful with EOS
-            token_ids = token_ids[:max_len]
-            numeric_features = numeric_features[:max_len]
-            attention_mask = attention_mask[:max_len]
-            # Ensure EOS is at max_len if it was there and got truncated
-            if token_ids[-1] != pad_id and token_ids[-1] != vocab.get(EOS_TOKEN):
-                # Optionally replace last token with EOS if it was truncated, but keep logic simple for now
-                pass 
+        token_ids_padded = token_ids_padded[:max_len]
+        numeric_features_padded = numeric_features_padded[:max_len]
+        attention_mask_padded = attention_mask_padded[:max_len]
+        
+        if not is_encoder:
+            if token_ids_padded and token_ids_padded[-1] != pad_id and token_ids_padded[-1] != vocab.get(EOS_TOKEN):
+                token_ids_padded[-1] = vocab[EOS_TOKEN]
+                # Ensure it's a new list of floats, matching numeric_feature_dim
+                numeric_features_padded[-1] = [float(x) for x in padded_feat_row]
+                attention_mask_padded[-1] = True
+            elif not token_ids_padded and max_len > 0:
+                token_ids_padded = [vocab[EOS_TOKEN]] + [pad_id] * (max_len - 1)
+                numeric_features_padded = [[float(x) for x in padded_feat_row]] * max_len
+                attention_mask_padded = [True] + [False] * (max_len - 1)
+
     elif current_len < max_len:
         padding_len = max_len - current_len
-        token_ids.extend([pad_id] * padding_len)
-        numeric_features.extend([padded_feat_row] * padding_len)
-        attention_mask.extend([False] * padding_len) # False for masked (padded) tokens
+        token_ids_padded.extend([pad_id] * padding_len)
+        # Each padded element must be a *copy* of padded_feat_row, not a reference
+        numeric_features_padded.extend([[float(x) for x in padded_feat_row] for _ in range(padding_len)])
+        attention_mask_padded.extend([False] * padding_len)
 
-    return token_ids, numeric_features, attention_mask
+    # Crucial: verify lengths before returning
+    if len(token_ids_padded) != max_len:
+        raise ValueError(f"token_ids_padded length mismatch: expected {max_len}, got {len(token_ids_padded)}")
+    if len(numeric_features_padded) != max_len:
+        raise ValueError(f"numeric_features_padded length mismatch: expected {max_len}, got {len(numeric_features_padded)}")
+    for i, features in enumerate(numeric_features_padded):
+        if len(features) != len(padded_feat_row): # Should be numeric_feature_dim
+            raise ValueError(f"Inner numeric feature vector length mismatch at index {i}: expected {len(padded_feat_row)}, got {len(features)}")
+    if len(attention_mask_padded) != max_len:
+        raise ValueError(f"attention_mask_padded length mismatch: expected {max_len}, got {len(attention_mask_padded)}")
+
+    return token_ids_padded, numeric_features_padded, attention_mask_padded
