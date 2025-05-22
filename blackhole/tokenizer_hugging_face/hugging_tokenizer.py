@@ -5,9 +5,9 @@ import unicodedata
 import json
 import torch
 from transformers import PreTrainedTokenizerFast, BatchEncoding
-from tokenizers import Tokenizer, models, pre_tokenizers, decoders, trainers, Regex # Ensure Regex is imported
+from tokenizers import Tokenizer, models, pre_tokenizers, decoders, trainers, Regex
 from tokenizers.processors import TemplateProcessing
-from tokenizers import Encoding as TokenizersEncoding # To avoid clash with typing.Encoding
+from tokenizers import Encoding as TokenizersEncoding
 from typing import List, Dict, Optional, Tuple, Union, Any, Iterator
 
 # Define special tokens
@@ -45,17 +45,12 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
             special_token_values = list(CUSTOM_SPECIAL_TOKENS.values())
             self.tokenizer.add_special_tokens(special_token_values)
             
-            # The pre_tokenizer handles initial splitting before our custom logic
-            # This WhitespaceSplit is good for getting initial "words"
-            # It should ideally be consistent with the sub_word_splitter regex.
-            # Using Regex for the pre-tokenizer is usually more powerful.
-            # Let's revert to using the Regex from the previous fix for consistency with sub_word_splitter.
             tokenizers_regex_pattern = Regex(
                 r"(\d+(?:[.,]\d+)*(?:[eE][-+]?\d+)?|\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b|https?://\S+|www\.\S+|[A-Za-z_]+(?:['\-][A-Za-z_]+)*|[^\s\w\d]|\s+)"
             )
             self.tokenizer.pre_tokenizer = pre_tokenizers.Split(
                 pattern=tokenizers_regex_pattern,
-                behavior="isolated" # "isolated" keeps the matched pattern as a separate token
+                behavior="isolated"
             )
 
             cls_id = self.tokenizer.token_to_id(CUSTOM_SPECIAL_TOKENS["cls_token"])
@@ -113,13 +108,11 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
             self.num_token, self.cap_token, self.allcaps_token
         }
         
-        # Store for decode method to use original text info
-        # Renamed for clarity and to avoid clash if you eventually wanted a public property.
         self._last_original_inputs_for_decode: List[str] = [] 
-        # Metadata from _prepare_text_for_bpe_and_collect_metadata
         self._last_original_metadata_for_decode: List[Tuple[List[Dict[str, Any]], List[int]]] = []
-        # Store the actual tokenizers.Encoding objects for detailed offset info
         self._last_encodings_objects: List[Optional[TokenizersEncoding]] = []
+        self._last_numbers_info: List[List[Dict[str, Any]]] = []
+
 
         # Improved regex pattern to properly handle spaces and tokens
         self.sub_word_splitter = re.compile(
@@ -136,9 +129,6 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
         
         def pre_tokenized_texts_for_training():
             for text in texts_iterator:
-                # When training, we need to provide the raw words/characters that the BPE model will learn from.
-                # Your `_prepare_text_for_bpe_and_collect_metadata` already does this by breaking down
-                # special types (numbers, caps, urls/emails) into characters.
                 processed_tokens, _, _ = self._prepare_text_for_bpe_and_collect_metadata(text)
                 yield processed_tokens
 
@@ -148,10 +138,8 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
             show_progress=show_progress,
             special_tokens=current_special_tokens
         )
-        # Using train_from_iterator with the generator
         self.tokenizer.train_from_iterator(pre_tokenized_texts_for_training(), trainer=trainer)
         
-        # Add any special tokens that weren't picked up during training (though `special_tokens` in trainer should handle this)
         self.add_special_tokens({
             k: v for k, v in CUSTOM_SPECIAL_TOKENS.items() if v not in self.get_vocab()
         })
@@ -167,13 +155,13 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
 
         url_pattern = re.compile(r"https?://\S+|www\.\S+")
         email_pattern = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
-        number_pattern = re.compile(r"^(?:[-+]?\d+(?:[.,]\d+)*(?:[eE][-+]?\d+)?)$")
-
+        # Updated number pattern to specifically check for scientific notation, integer, and float more robustly
+        number_pattern_strict = re.compile(r"^[+-]?\d+(?:[.,]\d+)*(?:[eE][+-]?\d+)?$")
+        
         for match_idx, match in enumerate(re.finditer(self.sub_word_splitter, text)):
             token_part_str = match.group(0)
 
-            # Create a metadata entry for the *original matched segment*
-            meta_entry = {'original_value': token_part_str, 'type': 'NONE'}
+            meta_entry = {'original_value': token_part_str, 'type': 'NONE', 'start': match.start(), 'end': match.end()}
             metadata_for_original_words.append(meta_entry)
             current_meta_list_idx = len(metadata_for_original_words) - 1
 
@@ -181,33 +169,50 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
                 meta_entry['type'] = 'SPACE'
                 processed_tokens_for_bpe.append(token_part_str)
                 map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
-            elif url_pattern.fullmatch(token_part_str):
+            elif url_pattern.fullmatch(token_part_str) or email_pattern.fullmatch(token_part_str):
                 meta_entry['type'] = 'URL_EMAIL'
+                # For URLs/Emails, we still break them into characters for BPE to learn sub-parts
                 for char in token_part_str:
                     processed_tokens_for_bpe.append(char)
                     map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
-            elif email_pattern.fullmatch(token_part_str): # Separate email check for clarity
-                meta_entry['type'] = 'URL_EMAIL'
-                for char in token_part_str:
-                    processed_tokens_for_bpe.append(char)
-                    map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
-            elif number_pattern.fullmatch(token_part_str):
+            elif number_pattern_strict.fullmatch(token_part_str):
                 meta_entry['type'] = 'NUM'
+                try:
+                    # Normalize comma to dot for float conversion
+                    normalized_num_str = token_part_str.replace(',', '.')
+                    
+                    if 'e' in normalized_num_str.lower() or '.' in normalized_num_str:
+                        parsed_value = float(normalized_num_str)
+                        meta_entry['numeric_value'] = parsed_value
+                        meta_entry['numeric_type'] = 'float'
+                        if 'e' in normalized_num_str.lower():
+                            meta_entry['numeric_format'] = 'scientific_notation'
+                        else:
+                            meta_entry['numeric_format'] = 'decimal_float'
+                    else:
+                        parsed_value = int(normalized_num_str)
+                        meta_entry['numeric_value'] = parsed_value
+                        meta_entry['numeric_type'] = 'int'
+                        meta_entry['numeric_format'] = 'integer'
+                except ValueError:
+                    meta_entry['numeric_value'] = None
+                    meta_entry['numeric_type'] = 'unknown'
+                    meta_entry['numeric_format'] = 'unknown'
+
+                # For numbers, we pass them as individual characters to BPE,
+                # so BPE can split them if needed (e.g., "123" -> ["1", "2", "3"] or ["12", "3"])
                 for char in token_part_str:
                     processed_tokens_for_bpe.append(char)
                     map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
             elif token_part_str.isupper() and len(token_part_str) > 1 and token_part_str.isalpha():
                 meta_entry['type'] = 'ALLCAPS'
-                for char in token_part_str:
-                    processed_tokens_for_bpe.append(char)
-                    map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
+                processed_tokens_for_bpe.append(token_part_str)
+                map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
             elif token_part_str[0].isupper() and not token_part_str.isupper() and token_part_str.isalpha():
                 meta_entry['type'] = 'CAP'
-                for char in token_part_str:
-                    processed_tokens_for_bpe.append(char)
-                    map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
-            else:
-                # Regular words and single symbols (that are not whitespace)
+                processed_tokens_for_bpe.append(token_part_str)
+                map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
+            else: # 'NONE' type or others
                 processed_tokens_for_bpe.append(token_part_str)
                 map_processed_idx_to_original_meta_idx.append(current_meta_list_idx)
         
@@ -230,10 +235,10 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
         self._last_original_inputs_for_decode = []
         self._last_original_metadata_for_decode = [] 
         self._last_encodings_objects = [] 
+        self._last_numbers_info = []
 
         is_batched = isinstance(text, list)
         
-        # Normalize inputs to lists for consistent processing
         text_list = text if is_batched else [text]
         text_pair_list = text_pair if is_batched and text_pair is not None else ([text_pair] if text_pair is not None else None)
 
@@ -243,36 +248,48 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
         processed_texts_for_bpe = []
         processed_text_pairs_for_bpe = None
 
-        # Process primary texts
-        for t_item in text_list:
-            # Store original text for potential decode operations
+        for t_idx, t_item in enumerate(text_list):
             self._last_original_inputs_for_decode.append(t_item)
 
             if t_item is None: 
                 processed_texts_for_bpe.append([]) 
                 self._last_original_metadata_for_decode.append(([], [])) 
+                self._last_numbers_info.append([])
                 continue
             
             words_for_bpe, metadata_list, processed_to_original_map = \
                 self._prepare_text_for_bpe_and_collect_metadata(t_item)
+            
             processed_texts_for_bpe.append(words_for_bpe)
             self._last_original_metadata_for_decode.append((metadata_list, processed_to_original_map))
 
-        # Process text_pair if provided
+            current_numbers_info_for_seq = []
+            for meta_entry in metadata_list:
+                if meta_entry['type'] == 'NUM' and meta_entry.get('numeric_value') is not None:
+                    # Store information about the number. Token ID mapping will be done after `super().__call__`.
+                    current_numbers_info_for_seq.append({
+                        'value': meta_entry['numeric_value'],
+                        'type': meta_entry['numeric_type'],
+                        'format': meta_entry['numeric_format'], # New: store the format
+                        'original_string': meta_entry['original_value'],
+                        'original_char_span': (meta_entry['start'], meta_entry['end']),
+                        # We temporarily store `processed_token_span` which refers to indices in `words_for_bpe`
+                        # This is a bit tricky since `char_to_token` uses original text character offsets
+                        # We'll rely on `char_to_token` after encoding for `token_ids_span`
+                        'token_ids_span': None,
+                        'token_ids': None,
+                    })
+            self._last_numbers_info.append(current_numbers_info_for_seq)
+
         if text_pair_list is not None:
             processed_text_pairs_for_bpe = []
             for tp_item in text_pair_list:
-                # We don't store text_pair metadata in _last_original_metadata_for_decode
-                # because the current decode logic only uses data for the first sequence.
-                # If needed for pair decoding, this structure would need to be enhanced.
                 if tp_item is None: 
                     processed_text_pairs_for_bpe.append([])
                     continue
                 words_for_bpe_p, _, _ = self._prepare_text_for_bpe_and_collect_metadata(tp_item) 
                 processed_text_pairs_for_bpe.append(words_for_bpe_p)
         
-        # Prepare inputs for the super class's __call__
-        # Important: set is_split_into_words=True because we've already done the initial splitting
         text_input_for_super = processed_texts_for_bpe if is_batched else processed_texts_for_bpe[0]
         text_pair_input_for_super = processed_text_pairs_for_bpe if is_batched and processed_text_pairs_for_bpe else (processed_text_pairs_for_bpe[0] if processed_text_pairs_for_bpe else None)
             
@@ -305,6 +322,40 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
             )
             self._last_encodings_objects = [temp_tokenizer_output]
             
+        # Now that we have the Encoding objects, we can resolve token ID spans for numbers
+        for i, encoding_obj in enumerate(self._last_encodings_objects):
+            if i < len(self._last_numbers_info): # Ensure we have corresponding metadata
+                current_numbers_info = self._last_numbers_info[i]
+                for num_entry in current_numbers_info:
+                    original_start_char, original_end_char = num_entry['original_char_span']
+                    
+                    # Use char_to_token to get the token index corresponding to the start of the original character span
+                    token_start_idx = encoding_obj.char_to_token(original_start_char)
+                    # Use char_to_token for the character *just before* the end of the original span to get the last token's index
+                    token_end_idx = encoding_obj.char_to_token(original_end_char - 1)
+
+                    if token_start_idx is not None and token_end_idx is not None:
+                        # Ensure we capture the full token span for multi-char pre-tokens (which BPE might split)
+                        # The `word_id` field in the tokenizers.Encoding object helps align BPE tokens back to pre-tokens.
+                        # `char_to_word` and `word_to_tokens` are more robust for this.
+
+                        # First, get the word_id corresponding to the original character span
+                        original_word_id = encoding_obj.char_to_word(original_start_char)
+
+                        if original_word_id is not None:
+                            # Then get the token span for that word_id
+                            token_span = encoding_obj.word_to_tokens(original_word_id)
+                            if token_span:
+                                num_entry['token_ids_span'] = (token_span.start, token_span.end) # tokenizers.tools.NormalizedToken spans are exclusive
+                                num_entry['token_ids'] = encoding_obj.ids[token_span.start : token_span.end]
+                        else:
+                            # Fallback if char_to_word fails for some reason (e.g., special tokens)
+                            num_entry['token_ids_span'] = (token_start_idx, token_end_idx + 1)
+                            num_entry['token_ids'] = encoding_obj.ids[token_start_idx : token_end_idx + 1]
+                    else:
+                        num_entry['token_ids_span'] = None
+                        num_entry['token_ids'] = None
+
         return encoded_inputs
 
     def decode(
@@ -320,14 +371,13 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
         if isinstance(token_ids, list) and token_ids and isinstance(token_ids[0], list):
             decoded_texts = []
             for i, ids_list in enumerate(token_ids):
-                # Retrieve the original text and its metadata for the current sequence
                 original_text_for_seq = self._last_original_inputs_for_decode[i] if i < len(self._last_original_inputs_for_decode) else None
                 metadata_tuple_for_seq = self._last_original_metadata_for_decode[i] if i < len(self._last_original_metadata_for_decode) else ([], [])
                 encoding_obj_for_seq = self._last_encodings_objects[i] if i < len(self._last_encodings_objects) else None
                 
                 decoded_text = self._decode_single_sequence(
                     ids_list, 
-                    original_text_for_seq, # Pass original text
+                    original_text_for_seq,
                     metadata_tuple_for_seq, 
                     encoding_obj_for_seq, 
                     skip_special_tokens, 
@@ -336,14 +386,13 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
                 decoded_texts.append(decoded_text)
             return decoded_texts
         else:
-            # For a single sequence
             original_text_for_seq = self._last_original_inputs_for_decode[0] if self._last_original_inputs_for_decode else None
             metadata_tuple_for_seq = self._last_original_metadata_for_decode[0] if self._last_original_metadata_for_decode else ([], [])
             encoding_obj_for_seq = self._last_encodings_objects[0] if self._last_encodings_objects else None
             
             return self._decode_single_sequence(
                 token_ids, 
-                original_text_for_seq, # Pass original text
+                original_text_for_seq,
                 metadata_tuple_for_seq, 
                 encoding_obj_for_seq, 
                 skip_special_tokens, 
@@ -353,26 +402,22 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
     def _decode_single_sequence(
         self, 
         token_ids: List[int], 
-        original_text: Optional[str], # Now explicitly passed
+        original_text: Optional[str],
         metadata_tuple: Tuple[List[Dict[str, Any]], List[int]], 
         encoding_obj: Optional[TokenizersEncoding], 
         skip_special_tokens: bool, 
         clean_up_tokenization_spaces: bool 
     ) -> str:
         
-        original_word_metadata_list, _ = metadata_tuple # We don't need map_processed_idx_to_original_meta_idx here with new strategy
+        original_word_metadata_list, _ = metadata_tuple
 
-        # If we don't have original text or metadata, fall back to basic decode
         if original_text is None or not original_word_metadata_list:
             return self.tokenizer.decode(token_ids, skip_special_tokens=skip_special_tokens)
 
-        # 1. First, perform a standard decode to get the raw text representation
-        # The internal `tokenizer.decode` handles BPE merging and basic space management.
-        raw_decoded_text = self.tokenizer.decode(token_ids, skip_special_tokens=True) # Always decode raw, then apply markers
+        # Decode raw to get the text that tokenizer.decode produces
+        raw_decoded_text = self.tokenizer.decode(token_ids, skip_special_tokens=True)
 
-        # 2. Re-process the raw decoded text using your _prepare_text_for_bpe_and_collect_metadata logic
-        # This will give us the "words" that the tokenizer *actually produced* and their types.
-        # This is more reliable than trying to map BPE tokens back to original segments.
+        # Reprocess the raw decoded text to re-identify original word boundaries and types
         reprocessed_tokens, reprocessed_metadata, _ = \
             self._prepare_text_for_bpe_and_collect_metadata(raw_decoded_text)
 
@@ -392,22 +437,40 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
                 elif meta_entry['type'] == 'NUM':
                     reconstructed_with_markers.append(f"{self.num_token}{segment_value}")
                 elif meta_entry['type'] == 'URL_EMAIL':
-                    # If you want to add a marker for URL_EMAIL, you can do it here
-                    # For now, treat as regular text without a dedicated marker for simplicity if not defined
                     reconstructed_with_markers.append(segment_value)
                 else: # 'NONE' type or others
                     reconstructed_with_markers.append(segment_value)
 
         result = "".join(reconstructed_with_markers)
         
-        # Re-add special tokens at the beginning and end if not skipping them
-        if not skip_special_tokens:
-            pass # No explicit re-addition of CLS/SEP here, as they are often handled by the decoder or the final post-processor
-
         if clean_up_tokenization_spaces:
             result = self._post_process_decoded_text(result)
         
         return result
+
+    def get_numeric_info(self, batch_index: int = 0) -> List[Dict[str, Any]]:
+        if not self._last_numbers_info or batch_index >= len(self._last_numbers_info):
+            return []
+        return self._last_numbers_info[batch_index]
+
+    def get_detected_numbers_summary(self, batch_index: int = 0) -> List[str]:
+        all_detected_numbers_summary = []
+        seen_numbers_for_summary = set()
+
+        # We rely on the already populated _last_numbers_info from the __call__ method
+        numbers_info_for_current_batch_item = self.get_numeric_info(batch_index=batch_index)
+
+        for num_entry in numbers_info_for_current_batch_item:
+            original_pretoken_unit = num_entry.get('original_string', 'N/A')
+            metadata_type = num_entry.get('format', 'NUM').upper() # Using 'format' for more specific type like SCIENTIFIC_NOTATION
+
+            # Add the number to the summary list if it hasn't been added yet
+            num_key = (original_pretoken_unit, metadata_type)
+            if num_key not in seen_numbers_for_summary:
+                all_detected_numbers_summary.append(f"['{original_pretoken_unit}', {metadata_type}]")
+                seen_numbers_for_summary.add(num_key)
+        
+        return all_detected_numbers_summary
 
     @property
     def vocab_size(self):
@@ -434,7 +497,6 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
         return super().from_pretrained(pretrained_model_name_or_path, *init_inputs, **kwargs)
 
     def _post_process_decoded_text(self, text: str) -> str:
-        # 1. Handle contractions
         text = text.replace(" n't", "n't") 
         text = text.replace(" 're", "'re") 
         text = text.replace(" 've", "'ve") 
@@ -443,17 +505,12 @@ class BlackholeTokenizer(PreTrainedTokenizerFast):
         text = text.replace(" 'm", "'m")  
         text = text.replace(" 'd", "'d")  
 
-        # 2. Handle punctuation spacing - be more conservative
-        # Remove space before certain punctuation that should attach to preceding word
         text = re.sub(r'\s+([.,!?;:])', r'\1', text)
         
-        # 3. Handle currency symbols - ensure no space between symbol and number
-        text = re.sub(r'([$€¥£])\s+(\d)', r'\1\2', text)
+        text = re.sub(r'([$€¥£])\s*([0-9])', r'\1\2', text)
         
-        # 4. Normalize quotes
         text = text.replace("''", '"').replace("``", '"')
         
-        # Basic whitespace cleanup (multiple spaces to single, leading/trailing spaces)
         text = re.sub(r'\s+', ' ', text).strip()
         
         return text

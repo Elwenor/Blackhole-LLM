@@ -2,6 +2,12 @@ import sys, os
 import torch
 from typing import List, Dict, Any, Tuple, Optional, Union, Iterator
 
+# Dodanie ścieżki do sys.path, aby zaimportować BlackholeTokenizer
+# Zakładając, że struktura katalogów to:
+# twój_projekt/
+# ├── blackhole/
+# │   └── tokenizer_hugging_face.py
+# └── twój_skrypt.py
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 from blackhole.tokenizer_hugging_face import BlackholeTokenizer 
@@ -10,25 +16,23 @@ import tokenizers
 print(f"Tokenizers version: {tokenizers.__version__}")
 
 def print_test_results(title, original_text, encoded_input, decoded_with_special, decoded_clean, tokenizer_obj):
-    """Pomocnicza funkcja do drukowania wyników testów w czytelny sposób."""
+    """Pomocnicza funkcja do drukowania wyników testów w czytelny sposób, z rozszerzonym śledzeniem i podsumowaniem liczb."""
     
+    # Normalizacja input_ids do płaskiej listy
     if isinstance(encoded_input['input_ids'], torch.Tensor):
-        # Jeśli to tensor, konwertuj na listę. Jeśli to partia, weź pierwszy element.
         if encoded_input['input_ids'].ndim > 1:
             encoded_ids_list = encoded_input['input_ids'][0].tolist()
         else:
             encoded_ids_list = encoded_input['input_ids'].tolist()
     elif isinstance(encoded_input['input_ids'], list):
-        # Jeśli to lista, sprawdź, czy to lista list (partia) czy płaska lista
         if encoded_input['input_ids'] and isinstance(encoded_input['input_ids'][0], list):
-            encoded_ids_list = encoded_input['input_ids'][0] # Weź pierwszą sekwencję
+            encoded_ids_list = encoded_input['input_ids'][0]
         else:
-            encoded_ids_list = encoded_input['input_ids'] # Jest już płaską listą
+            encoded_ids_list = encoded_input['input_ids']
     else:
-        # Fallback dla nieoczekiwanych typów, choć BatchEncoding powinien obejmować tensory/listy
-        encoded_ids_list = [] # Lub zgłoś błąd
+        encoded_ids_list = []
 
-    # Upewnij się, że attention_mask_list jest zawsze płaską listą liczb całkowitych
+    # Normalizacja attention_mask do płaskiej listy
     if isinstance(encoded_input['attention_mask'], torch.Tensor):
         if encoded_input['attention_mask'].ndim > 1:
             attention_mask_list = encoded_input['attention_mask'][0].tolist()
@@ -42,23 +46,19 @@ def print_test_results(title, original_text, encoded_input, decoded_with_special
     else:
         attention_mask_list = []
 
-    # --- Poprawne użycie convert_ids_to_tokens ---
+    # Konwersja ID na tokeny stringowe
     try:
-        # `convert_ids_to_tokens` przyjmuje listę ID i zwraca listę stringów
-        # To jest metoda z PreTrainedTokenizerFast i powinna działać z płaską listą intów.
         encoded_tokens_from_ids = tokenizer_obj.convert_ids_to_tokens(encoded_ids_list)
     except Exception as e:
         encoded_tokens_from_ids = f"Error converting IDs to tokens: {e}"
 
     print(f"\n--- Test: {title} ---")
-    print(f"Original text:                 '{original_text}'")
-    print(f"Encoded input (IDs):           {encoded_ids_list}") 
-    print(f"Encoded tokens (from IDs):     {encoded_tokens_from_ids}") 
-    print(f"Attention mask:                {attention_mask_list}")
+    print(f"Original text:                      '{original_text}'")
+    print(f"Encoded input (IDs):                {encoded_ids_list}") 
+    print(f"Encoded tokens (from IDs):          {encoded_tokens_from_ids}") 
+    print(f"Attention mask:                     {attention_mask_list}")
     
-    # Dostęp do przechowywanych metadanych i kodowania dla tej partii
     current_encoding = tokenizer_obj._last_encodings_objects[0] if tokenizer_obj._last_encodings_objects else None
-    
     current_metadata_tuple = tokenizer_obj._last_original_metadata_for_decode[0] if tokenizer_obj._last_original_metadata_for_decode else ([], [])
     original_word_metadata_list_for_trace = current_metadata_tuple[0]
     map_processed_idx_to_original_meta_idx_for_trace = current_metadata_tuple[1]
@@ -66,6 +66,9 @@ def print_test_results(title, original_text, encoded_input, decoded_with_special
     print("\n--- Detailed Tokenization Trace ---")
     print("Original Pre-tokenized Unit | Metadata Type | BPE Token ID | BPE Token Str | Word ID (from Encoding)")
     print("-----------------------------------------------------------------------------------------------------")
+
+    all_detected_numbers = []
+    seen_numbers_for_summary = set() 
 
     if current_encoding:
         for bpe_token_idx in range(len(current_encoding.ids)):
@@ -81,17 +84,32 @@ def print_test_results(title, original_text, encoded_input, decoded_with_special
             original_pretoken_unit = "N/A"
             metadata_type = "N/A"
             
-            if word_id_from_encoding is not None and word_id_from_encoding < len(map_processed_idx_to_original_meta_idx_for_trace):
+            if word_id_from_encoding is not None and original_word_metadata_list_for_trace and \
+               word_id_from_encoding < len(map_processed_idx_to_original_meta_idx_for_trace):
                 original_meta_idx = map_processed_idx_to_original_meta_idx_for_trace[word_id_from_encoding]
                 if original_meta_idx is not None and original_meta_idx < len(original_word_metadata_list_for_trace):
-                    original_pretoken_unit = original_word_metadata_list_for_trace[original_meta_idx]['original_value']
-                    metadata_type = original_word_metadata_list_for_trace[original_meta_idx]['type']
+                    original_token_meta = original_word_metadata_list_for_trace[original_meta_idx]
+                    original_pretoken_unit = original_token_meta.get('original_value', 'N/A')
+                    metadata_type = original_token_meta.get('type', 'N/A')
+
+                    # Dodaj numer do listy podsumowania, jeśli jest to liczba i nie została jeszcze dodana
+                    # UWAGA: Dodano 'NUM' do listy typów
+                    if metadata_type in ['NUM', 'NUMBER', 'FLOAT', 'HEX', 'DATE', 'TIME', 'CURRENCY', 'SCIENTIFIC_NOTATION', 'COMPLEX_NUMBER', 'PERCENT', 'ABBREVIATION']:
+                        num_key = (original_pretoken_unit, metadata_type)
+                        if num_key not in seen_numbers_for_summary:
+                            all_detected_numbers.append(f"[{original_pretoken_unit}, {metadata_type}]")
+                            seen_numbers_for_summary.add(num_key)
 
             print(f"{original_pretoken_unit:<27} | {metadata_type:<13} | {bpe_id:<12} | {bpe_token_str:<13} | {str(word_id_from_encoding):<25}")
     else:
         print("No encoding object or metadata available for detailed trace (likely a batch > 1 or error).")
     
     print("-----------------------------------------------------------------------------------------------------")
+
+    if all_detected_numbers:
+        print(f"Numbers detected: {' '.join(all_detected_numbers)}")
+    else:
+        print("No specific numbers detected in this text for summary.")
 
     print(f"Decoded text (with special):   '{decoded_with_special}'")
     print(f"Decoded text (without special):'{decoded_clean}'")
@@ -219,6 +237,12 @@ if __name__ == "__main__":
     decoded_clean_11 = loaded_tokenizer.decode(encoded_input_11['input_ids'][0], skip_special_tokens=True)
     print_test_results("Currency", test_text_11, encoded_input_11, decoded_text_11, decoded_clean_11, loaded_tokenizer)
 
+    # --- Test 12: Mixed numerical formats ---
+    test_text_12 = "Result: -1.23e-4. Page 12-15. ID345-ABC. My number is 3+4i."
+    encoded_input_12 = loaded_tokenizer(test_text_12, return_tensors="pt")
+    decoded_text_12 = loaded_tokenizer.decode(encoded_input_12['input_ids'][0], skip_special_tokens=False)
+    decoded_clean_12 = loaded_tokenizer.decode(encoded_input_12['input_ids'][0], skip_special_tokens=True)
+    print_test_results("Mixed Numerical Formats", test_text_12, encoded_input_12, decoded_text_12, decoded_clean_12, loaded_tokenizer)
 
     # Informacje o tokenach specjalnych
     print(f"\n--- Special Token Information ---")
