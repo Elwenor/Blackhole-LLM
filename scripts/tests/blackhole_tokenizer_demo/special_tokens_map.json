@@ -1,8 +1,7 @@
 {
   "additional_special_tokens": [
-    "[NUM]",
-    "[CAP]",
-    "[ALLCAPS]"
+    "$",
+    "%"
   ],
   "cls_token": "[CLS]",
   "mask_token": "[MASK]",

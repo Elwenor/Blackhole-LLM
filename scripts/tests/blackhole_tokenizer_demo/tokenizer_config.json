@@ -64,12 +64,27 @@
       "rstrip": false,
       "single_word": false,
       "special": true
+    },
+    "8": {
+      "content": "$",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "9": {
+      "content": "%",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
     }
   },
   "additional_special_tokens": [
-    "[NUM]",
-    "[CAP]",
-    "[ALLCAPS]"
+    "$",
+    "%"
   ],
   "clean_up_tokenization_spaces": false,
   "cls_token": "[CLS]",
