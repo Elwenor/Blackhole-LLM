@@ -2,19 +2,10 @@ import torch
 import torch.nn as nn
 import math
 from typing import Optional, Tuple
-# from transformers.activations import ACT2FN
-# Importujemy ACT2FN z modułu transformers.models.bert.modeling_bert
-# aby uniknąć zależności od całego transformers.activations
 from transformers.models.bert.modeling_bert import ACT2FN
 from transformers import PretrainedConfig
 
-# Aby upewnić się, że BlackholeTokenizer jest dostępne zgodnie z Twoją ścieżką
-import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
-from blackhole.tokenizer_hugging_face import BlackholeTokenizer # Zachowuję Twój import
-
 # Klasa konfiguracyjna modelu, dziedzicząca z PretrainedConfig
-# Powinna zawierać wszystkie niezbędne parametry dla BlackholeEmbeddings
 class BlackholeConfig(PretrainedConfig):
     model_type = "blackhole" # Unikalny typ modelu
 
@@ -29,12 +20,27 @@ class BlackholeConfig(PretrainedConfig):
         pad_token_id: int = 1,    # Ustaw na rzeczywiste ID paddingu z Twojego tokenizer'a
         num_token_id: int = 5,    # Ustaw na rzeczywiste ID tokenu [NUM] z Twojego tokenizer'a
         # Nowe parametry dla zaawansowanych cech numerycznych
-        numeric_feature_dims: dict = { # Wymiary dla poszczególnych typów cech
-            "log_value": 1,             # Logarytm z wartości bezwzględnej
-            "sign": 1,                  # Znak liczby
-            "exponent": 1,              # Wykładnik potęgi 10 (rzędu wielkości)
-            "binary_representation": 16, # Uproszczona binarna reprezentacja (np. 16 bitów)
-            "format_type": 3,           # One-hot encoding dla 3 typów formatów (int, float, scientific)
+        numeric_feature_dims: dict = { # Wymiary dla poszczególnych typów cech (suma musi wynieść 96)
+            # HEAVY LAYERS / Highly Informative Features (64 + 20 = 84 cechy)
+            "float64_binary_repr": 64,    # 64-bitowa reprezentacja IEEE 754 (najcięższa)
+            "digit_pos_0": 10,            # One-hot dla cyfry jedności (0-9)
+            "digit_pos_1": 10,            # One-hot dla cyfry dziesiątek (0-9)
+
+            # LIGHT LAYERS / Simpler Informative Features (5 + 7 = 12 cech)
+            "log_value": 1,              # Logarytm z wartości bezwzględnej
+            "sign": 1,                   # Znak liczby (-1, 0, 1)
+            "exponent_base10": 1,        # Wykładnik potęgi 10 (rząd wielkości)
+            "num_total_digits": 1,       # Całkowita liczba cyfr (przed i po przecinku)
+            "num_decimal_places": 1,     # Liczba miejsc po przecinku
+
+            "is_integer_flag": 1,        # Czy liczba jest całkowita
+            "is_positive_flag": 1,       # Czy liczba jest dodatnia
+            "is_zero_flag": 1,           # Czy liczba jest równa 0
+            "is_negative_flag": 1,       # Czy liczba jest ujemna
+            "is_power_of_2_flag": 1,     # Czy jest potęgą 2
+            "format_type_int": 1,        # Czy format to integer (one-hot)
+            "format_type_float": 1,      # Czy format to float (one-hot)
+            # Suma wszystkich cech: 64 + 10 + 10 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 = 96
         },
         numeric_projection_intermediate_size_ratio: float = 0.5, # np. 0.5 * hidden_size
         numeric_embedding_fusion_type: str = "gating", # "add", "concat", "gating"
@@ -53,6 +59,11 @@ class BlackholeConfig(PretrainedConfig):
         # Oblicz całkowitą liczbę wejściowych cech numerycznych
         self.numeric_feature_dims = numeric_feature_dims
         self.numeric_input_features = sum(numeric_feature_dims.values())
+        if self.numeric_input_features != 96:
+            raise ValueError(
+                f"Suma cech numerycznych musi wynosić 96. Obecnie wynosi: {self.numeric_input_features}. "
+                "Sprawdź definicję 'numeric_feature_dims' w BlackholeConfig."
+            )
 
         self.numeric_projection_intermediate_size = int(hidden_size * numeric_projection_intermediate_size_ratio)
         self.numeric_embedding_fusion_type = numeric_embedding_fusion_type
@@ -76,6 +87,7 @@ class BlackholeEmbeddings(nn.Module):
 
         # --- Zaawansowana warstwa do osadzania liczb ---
         # Ta sieć MLP będzie przekształcać rozbudowane cechy numeryczne w wektor osadzeń.
+        # Warstwy liniowe są domyślnie inicjowane jako float32, co jest standardem dla większości modeli.
         self.numeric_embedding_projection = nn.Sequential(
             nn.Linear(config.numeric_input_features, config.numeric_projection_intermediate_size),
             ACT2FN["gelu"], # Aktywacja GELU z Hugging Face
@@ -83,16 +95,19 @@ class BlackholeEmbeddings(nn.Module):
             nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps) # Normalizacja po projekcji
         )
 
+        # NIE KONWERTUJEMY numeric_embedding_projection NA DOUBLE TUTAJ
+        # Zamiast tego, wejście do tej warstwy będzie konwertowane na float32 w forward pass.
+
         # Mechanizm bramkowania (gating) dla fuzji osadzeń numerycznych z tekstowymi
         self.numeric_embedding_fusion_type = config.numeric_embedding_fusion_type
         if self.numeric_embedding_fusion_type == "gating":
-            # Bramka bierze konkatenację osadzeń tekstowych i numerycznych w pozycji [NUM]
+            # Te warstwy również pozostają w float32
             self.numeric_gate = nn.Linear(config.hidden_size * 2, config.hidden_size)
             self.gate_activation = nn.Sigmoid()
         elif self.numeric_embedding_fusion_type == "add":
             pass # Fuzja przez dodawanie, nie potrzebuje dodatkowych warstw
         elif self.numeric_embedding_fusion_type == "concat":
-            # Jeśli łączymy, hidden_size musi być dostosowane w dalszych warstwach, lub musimy mieć projekcję
+            # Ta warstwa również pozostaje w float32
             self.concat_projection = nn.Linear(config.hidden_size * 2, config.hidden_size)
         else:
             raise ValueError(f"Nieznany typ fuzji numerycznej: {config.numeric_embedding_fusion_type}. Oczekiwano 'add', 'concat' lub 'gating'.")
@@ -110,80 +125,165 @@ class BlackholeEmbeddings(nn.Module):
         """
         Przetwarza surowe wartości liczbowe i ich formaty na wejściowe cechy numeryczne
         dla `numeric_embedding_projection`.
+        Wewnętrznie używa float64 dla maksymalnej precyzji podczas ekstrakcji cech,
+        ale zwraca float32, aby było kompatybilne z pozostałą częścią modelu.
 
         Args:
             values (torch.Tensor): Tensor wartości numerycznych (tylko faktyczne liczby).
+                                   Powinien być typu torch.float64 dla precyzji binarnej.
             formats (torch.Tensor, optional): Tensor z ID formatów numerycznych
-                                              (0: int, 1: float, 2: scientific, -1: padding/nan).
+                                           (0: int, 1: float, 2: scientific, 3: hexadecimal).
         Returns:
-            torch.Tensor: Złączone cechy numeryczne. Kształt: (num_numeric_tokens, total_features).
+            torch.Tensor: Złączone cechy numeryczne, TYPU torch.float32.
+                          Kształt: (num_numeric_tokens, total_features).
         """
         features_list = []
         device = values.device
 
-        # 1. Logarytm z wartości bezwzględnej (log_value)
-        if self.config.numeric_feature_dims.get("log_value", 0) > 0:
-            log_abs_values = torch.log(torch.abs(values) + 1e-6) # Dodajemy mały epsilon dla stabilności
-            features_list.append(log_abs_values.unsqueeze(-1))
+        # WAŻNE: Upewniamy się, że wartości są w float64 dla dokładnej reprezentacji bitowej
+        # Konwersja na double (float64) jest bezpieczna i zapewnia maksymalną precyzję
+        # podczas ekstrakcji cech, zwłaszcza dla float64_binary_repr.
+        if values.dtype != torch.float64:
+            values = values.double()
 
-        # 2. Znak liczby (sign)
+        # --- HEAVY LAYERS / Highly Informative Features (84 cechy) ---
+
+        # 1. Pełna 64-bitowa reprezentacja IEEE 754 (float64_binary_repr) - 64 cechy
+        if self.config.numeric_feature_dims.get("float64_binary_repr", 0) > 0:
+            num_bits = self.config.numeric_feature_dims["float64_binary_repr"]
+
+            # Reinterpretacja bitów float jako int64
+            long_values = values.view(torch.int64)
+
+            # Tworzymy maski bitowe: [1, 2, 4, 8, ..., 2^63]
+            bit_indices = torch.arange(num_bits, device=device, dtype=torch.int64)
+            masks = (1 << bit_indices)
+
+            # Wykonujemy bitowe AND i sprawdzamy, czy bit jest ustawiony
+            binary_features = ((long_values.unsqueeze(-1) & masks) > 0).float() # Konwertujemy na float32
+            features_list.append(binary_features)
+
+        # 2. Cechy Pozycji Cyfr (20 cech)
+        abs_values = torch.abs(values)
+
+        # 2.1. Cyfra jedności (digit_pos_0) - 10 cech (one-hot)
+        if self.config.numeric_feature_dims.get("digit_pos_0", 0) > 0:
+            units_digit = (abs_values.floor() % 10).long()
+            units_digit = torch.clamp(units_digit, 0, 9)
+            one_hot_units = torch.nn.functional.one_hot(units_digit, num_classes=10).float()
+            features_list.append(one_hot_units)
+
+        # 2.2. Cyfra dziesiątek (digit_pos_1) - 10 cech (one-hot)
+        if self.config.numeric_feature_dims.get("digit_pos_1", 0) > 0:
+            tens_digit = ((abs_values.floor() // 10) % 10).long()
+            tens_digit = torch.clamp(tens_digit, 0, 9)
+            one_hot_tens = torch.nn.functional.one_hot(tens_digit, num_classes=10).float()
+            features_list.append(one_hot_tens)
+
+        # --- LIGHT LAYERS / Simpler Informative Features (12 cech) ---
+
+        # 3. Cechy Skalarne (5 cech)
+
+        # 3.1. Logarytm z wartości bezwzględnej (log_value)
+        if self.config.numeric_feature_dims.get("log_value", 0) > 0:
+            log_abs_values = torch.log(torch.abs(values) + 1e-6)
+            features_list.append(log_abs_values.unsqueeze(-1).float())
+
+        # 3.2. Znak liczby (sign)
         if self.config.numeric_feature_dims.get("sign", 0) > 0:
             signs = torch.sign(values)
-            signs[values == 0.0] = 0.0 # Upewniamy się, że dla 0 znak to 0
-            features_list.append(signs.unsqueeze(-1))
+            signs[values == 0.0] = 0.0
+            features_list.append(signs.unsqueeze(-1).float())
 
-        # 3. Wykładnik potęgi 10 (exponent)
-        if self.config.numeric_feature_dims.get("exponent", 0) > 0:
-            # Dla floatów (lub ogólnie liczb), możemy użyć log10 do wyznaczenia rzędu wielkości
-            # obsługa log10(0) i wartości ujemnych
+        # 3.3. Wykładnik potęgi 10 (exponent_base10)
+        if self.config.numeric_feature_dims.get("exponent_base10", 0) > 0:
             exponents = torch.where(
-                torch.abs(values) > 1e-6, # Tylko dla niezerowych wartości
+                torch.abs(values) > 1e-6,
                 torch.floor(torch.log10(torch.abs(values))),
-                torch.tensor(0.0, device=device) # Ustaw 0 dla bardzo małych/zerowych wartości
+                torch.tensor(0.0, device=device, dtype=values.dtype)
             )
-            features_list.append(exponents.unsqueeze(-1))
+            features_list.append(exponents.unsqueeze(-1).float())
 
-        # 4. Uproszczona Binarna Reprezentacja (binary_representation)
-        # To jest uproszczona implementacja. Prawdziwa binarna dla floatów jest bardziej złożona.
-        # Może to być np. sinusoidalne osadzenie liczby, lub "hash" bitowy.
-        if self.config.numeric_feature_dims.get("binary_representation", 0) > 0:
-            # Możesz użyć np. sinusoidalnych osadzeń dla wartości numerycznej jako "proxy" dla binarnej
-            # lub prostej projekcji na N bitów
-            num_bits = self.config.numeric_feature_dims["binary_representation"]
-            
-            # Poniżej prosta próba rzutowania na bity. Dla floatów to jest bardzo nieidealne.
-            # Lepszym podejściem byłoby np. `torch.fmod(values * 2**i, 1.0)` do "rozkładania" ułamków.
-            # Albo użycie funkcji kwantyzacji do mapowania liczb na zbiór "bucketów" i ich osadzania.
-            # Na potrzeby tego kodu, będziemy generować "bity" z hash'a lub rzutowania.
-            
-            # Jeśli masz liczby całkowite, możesz je rzutować na int i potem na bity:
-            # integer_part = values.long()
-            # bit_features = ((integer_part.unsqueeze(-1) >> torch.arange(num_bits, device=device)) & 1).float()
-            # features_list.append(bit_features)
-            
-            # Dla ogólnych floatów, to jest miejsce na innowację.
-            # Na potrzeby tego testu, stworzymy pewne 'pseudo-bity' z wartości.
-            # Np. mapowanie wartości na przedział [0, 1] i potem na bity
-            # (values - min_val) / (max_val - min_val)
-            # Na razie jako placeholder: generujemy losowe bity (w rzeczywistości musiałoby być zdeterminowane przez wartość)
-            pseudo_binary_features = torch.randn(values.shape[0], num_bits, device=device) # Zastąp to rzeczywistą logiką
-            features_list.append(pseudo_binary_features)
+        # 3.4. Całkowita liczba cyfr w liczbie (num_total_digits)
+        if self.config.numeric_feature_dims.get("num_total_digits", 0) > 0:
+            # Uwaga: użycie pętli i konwersji na string jest nieoptymalne dla GPU.
+            # Lepszym podejściem byłoby wstępne obliczenie tego w tokenizerze i przekazanie.
+            # Na potrzeby funkcjonalności utrzymujemy obecne podejście.
+            total_digits_tensor = torch.tensor([
+                sum(1 for char in str(val.item()).replace('.', '').replace('-', '').lower().split('e')[0] if char.isdigit())
+                for val in values
+            ], dtype=torch.float32, device=device)
+            features_list.append(total_digits_tensor.unsqueeze(-1))
 
 
-        # 5. Typ formatu (format_type)
-        if formats is not None and self.config.numeric_feature_dims.get("format_type", 0) > 0:
-            # Formaty: 0=int, 1=float, 2=scientific (lub inne, jeśli zdefiniujesz więcej)
-            # Upewnij się, że formats jest odpowiednio przeskalowany/zakodowany z tokenizera.
-            # Formaty -1 (padding) powinny być ignorowane w `_get_numeric_features`.
-            # Ta funkcja _get_numeric_features jest wywoływana TYLKO dla `actual_numeric_values`
-            # więc `formats` tutaj nie powinno zawierać -1.
-            one_hot_formats = torch.nn.functional.one_hot(
-                formats.long(), num_classes=self.config.numeric_feature_dims["format_type"]
-            ).float()
-            features_list.append(one_hot_formats)
+        # 3.5. Liczba miejsc po przecinku (num_decimal_places)
+        if self.config.numeric_feature_dims.get("num_decimal_places", 0) > 0:
+            decimal_places_tensor = torch.tensor([
+                (lambda s: len(s.split('.')[-1]) if '.' in s else 0)(str(val.item()).lower().split('e')[0])
+                for val in values
+            ], dtype=torch.float32, device=device)
+            features_list.append(decimal_places_tensor.unsqueeze(-1))
+
+        # 4. Flagi Logiczne/Semantyczne (7 cech)
+
+        # 4.1. Czy liczba jest całkowita (is_integer_flag)
+        if self.config.numeric_feature_dims.get("is_integer_flag", 0) > 0:
+            is_integer = (torch.abs(values) == torch.abs(values).floor()).float()
+            features_list.append(is_integer.unsqueeze(-1))
+
+        # 4.2. Czy liczba jest dodatnia (is_positive_flag)
+        if self.config.numeric_feature_dims.get("is_positive_flag", 0) > 0:
+            is_positive = (values > 0).float()
+            features_list.append(is_positive.unsqueeze(-1))
+
+        # 4.3. Czy liczba jest równa 0 (is_zero_flag)
+        if self.config.numeric_feature_dims.get("is_zero_flag", 0) > 0:
+            is_zero = (values == 0.0).float()
+            features_list.append(is_zero.unsqueeze(-1))
+
+        # 4.4. Czy liczba jest ujemna (is_negative_flag)
+        if self.config.numeric_feature_dims.get("is_negative_flag", 0) > 0:
+            is_negative = (values < 0).float()
+            features_list.append(is_negative.unsqueeze(-1))
+
+        # 4.5. Czy liczba jest potęgą 2 (is_power_of_2_flag)
+        if self.config.numeric_feature_dims.get("is_power_of_2_flag", 0) > 0:
+            is_positive_integer = (values == values.floor()) & (values > 0)
+
+            log2_val_safe = torch.full_like(values, float('nan'), dtype=torch.float64)
+            valid_indices = is_positive_integer.nonzero(as_tuple=True)[0]
+
+            if valid_indices.numel() > 0:
+                log2_val_safe[valid_indices] = torch.log2(values[valid_indices])
+
+            is_log2_integer = (log2_val_safe == log2_val_safe.floor())
+
+            is_power_of_2 = (is_positive_integer & is_log2_integer).float()
+            features_list.append(is_power_of_2.unsqueeze(-1))
+
+        # 4.6 i 4.7. Typ formatu (format_type_int, format_type_float)
+        if formats is not None:
+            if self.config.numeric_feature_dims.get("format_type_int", 0) > 0:
+                is_format_int = (formats == 0).float()
+                features_list.append(is_format_int.unsqueeze(-1))
+            if self.config.numeric_feature_dims.get("format_type_float", 0) > 0:
+                is_format_float = (formats == 1).float()
+                features_list.append(is_format_float.unsqueeze(-1))
+
 
         # Łączymy wszystkie cechy w jeden tensor
-        combined_features = torch.cat(features_list, dim=-1)
+        # WAŻNE: Konwertujemy wszystkie cechy na float32 przed złączeniem i zwróceniem,
+        # aby były zgodne z oczekiwanym dtype warstwy projekcji.
+        combined_features = torch.cat([f.to(torch.float32) for f in features_list], dim=-1)
+
+        if combined_features.shape[-1] != self.config.numeric_input_features:
+            raise ValueError(
+                f"Niezgodność liczby wygenerowanych cech ({combined_features.shape[-1]}) "
+                f"z oczekiwaną w konfiguracji ({self.config.numeric_input_features}). "
+                f"Upewnij się, że wszystkie klucze w `numeric_feature_dims` są obsługiwane w `_get_numeric_features` "
+                f"i że ich sumy się zgadzają z {self.config.numeric_input_features}."
+            )
+
         return combined_features
 
 
@@ -216,85 +316,58 @@ class BlackholeEmbeddings(nn.Module):
             token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=device)
         text_token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        # Sumowanie osadzeń tekstowych (bazowe osadzenie)
+        # Sumowanie osadzeń tekstowych (bazowe osadzenie), upewnij się, że są float32
         text_embeddings = text_word_embeddings + text_position_embeddings + text_token_type_embeddings
+        text_embeddings = text_embeddings.to(torch.float32)
 
         # --- Generowanie osadzeń numerycznych dla tokenów [NUM] ---
-        # Maska dla pozycji, które są tokenami [NUM] I mają rzeczywiste wartości liczbowe (nie NaN)
-        # `is_num_token_mask` identyfikuje, gdzie w input_ids jest [NUM]
         is_num_token_mask = (input_ids == self.num_token_id)
-        # `has_numeric_value_mask` sprawdza, czy w `numeric_values` nie ma NaN w tych pozycjach
         has_numeric_value_mask = ~torch.isnan(numeric_values)
-        
-        # Ostateczna maska dla pozycji, gdzie faktycznie powinniśmy generować numeryczne embeddingi
-        # (tylko tam, gdzie jest token [NUM] i przypisana do niego sensowna wartość numeryczna)
+
         active_numeric_positions_mask = is_num_token_mask & has_numeric_value_mask
 
-        # Inicjalizacja tensora dla osadzeń numerycznych (zerami).
-        # Będą one niezerowe tylko w miejscach wskazanych przez `active_numeric_positions_mask`.
+        # Inicjalizacja tensora dla osadzeń numerycznych (zerami), typu float32
         numeric_embeds_for_fusion = torch.zeros(
             input_shape[0], input_shape[1], self.config.hidden_size,
-            device=device, dtype=text_embeddings.dtype
+            device=device, dtype=torch.float32 # Tutaj powinno być float32
         )
 
         if active_numeric_positions_mask.any():
             # Pobierz wartości i formaty tylko dla aktywowanych pozycji numerycznych
+            # numeric_values mogą być torch.float64, ale _get_numeric_features to obsłuży
             actual_numeric_values = numeric_values[active_numeric_positions_mask]
             actual_numeric_formats = None
             if numeric_formats is not None:
                 actual_numeric_formats = numeric_formats[active_numeric_positions_mask]
 
-            # Generuj zaawansowane cechy numeryczne
+            # Generuj zaawansowane cechy numeryczne (zwróci float32)
             processed_numeric_features = self._get_numeric_features(actual_numeric_values, actual_numeric_formats)
 
-            # Przekształć cechy w osadzenia numeryczne
+            # Przekształć cechy w osadzenia numeryczne za pomocą MLP (oczekuje float32)
             projected_numeric_embeds = self.numeric_embedding_projection(processed_numeric_features)
 
             # Umieść wygenerowane osadzenia z powrotem w tensorze `numeric_embeds_for_fusion`
             numeric_embeds_for_fusion[active_numeric_positions_mask] = projected_numeric_embeds
 
         # --- Fuzja osadzeń tekstowych i numerycznych ---
-        # Tutaj następuje inteligentne łączenie informacji tekstowych i numerycznych.
+        # Oba tensory (text_embeddings i numeric_embeds_for_fusion) są teraz float32.
+
         if self.numeric_embedding_fusion_type == "gating":
-            # Mechanizm bramkowania: model dynamicznie decyduje, jak dużo informacji numerycznej włączyć.
-            # Konkatenuje oba typy embeddingów dla tokenów [NUM] i uczy się wagi.
-            
-            # Przygotowujemy input dla bramki, łącząc text_embeddings i numeric_embeds_for_fusion
-            # Tylko dla tych pozycji, które są aktywne numerycznie
-            
-            # Tworzymy tensor, który będzie zawierał połączone embeddingi tylko dla aktywnych pozycji numerycznych
-            # Pozostałe miejsca będą miały zera lub inną bazową wartość, aby bramka nie była uczona na nich.
-            
-            # W bardziej zaawansowanych implementacjach, bramka może być uczona dla wszystkich tokenów,
-            # lub tylko dla tych, które są [NUM]. Tutaj uczymy bramkę tylko dla [NUM] tokenów.
-            
-            # Jeśli bramka działa na CAŁYM tensorze (batch_size, seq_len, hidden_size * 2)
-            # a numeric_embeds_for_fusion ma zera tam, gdzie nie ma liczb, to jest to ok.
-            
-            # Wartość bramki dla pozycji, które nie są tokenami [NUM], będzie bliska 0 lub 1
-            # w zależności od tego, jak model nauczy się je traktować.
-            
             combined_for_gate = torch.cat((text_embeddings, numeric_embeds_for_fusion), dim=-1)
+            # numeric_gate i gate_activation są teraz w float32
             gate = self.gate_activation(self.numeric_gate(combined_for_gate))
-            
-            # Finalne osadzenie to ważona suma osadzeń tekstowych i numerycznych
-            # Dla pozycji, które nie są [NUM], numeric_embeds_for_fusion jest zerem,
-            # więc gate * 0 jest 0. Wtedy (1 - gate) * text_embeddings jest dominujące.
             final_embeddings = (1 - gate) * text_embeddings + gate * numeric_embeds_for_fusion
 
         elif self.numeric_embedding_fusion_type == "add":
-            # Proste dodawanie: informacja numeryczna dodawana do tekstowej.
-            # Numeric_embeds_for_fusion ma zera tam, gdzie nie ma [NUM] tokenu.
             final_embeddings = text_embeddings + numeric_embeds_for_fusion
 
         elif self.numeric_embedding_fusion_type == "concat":
-            # Konkatenacja, a następnie projekcja do docelowego hidden_size.
-            # Wymaga, aby self.concat_projection istniało.
             concatenated_embeddings = torch.cat((text_embeddings, numeric_embeds_for_fusion), dim=-1)
+            # concat_projection jest teraz w float32
             final_embeddings = self.concat_projection(concatenated_embeddings)
-        
-        else: # Powinno być już obsłużone w __init__, ale dla bezpieczeństwa
-            final_embeddings = text_embeddings # Domyślny fallback
+
+        else:
+            final_embeddings = text_embeddings
 
         # --- Finalna normalizacja i dropout dla całego tensora osadzeń ---
         final_embeddings = self.LayerNorm(final_embeddings)
