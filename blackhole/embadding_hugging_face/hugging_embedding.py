@@ -59,14 +59,6 @@ class BlackholeConfig(PretrainedConfig):
 
 
 class BlackholeEmbeddings(nn.Module):
-    """
-    Warstwa osadzeń dla modelu Blackhole-LLM, obsługująca dwa strumienie:
-    - Strumień tekstowy (tokeny BPE + specjalne tokeny)
-    - Strumień numeryczny (rzeczywiste wartości liczbowe + ich cechy)
-
-    Łączy osadzenia tokenów, osadzenia pozycji oraz specjalne osadzenia numeryczne,
-    przygotowując je do dalszego przetwarzania w architekturze Transformera.
-    """
     def __init__(self, config: BlackholeConfig):
         super().__init__()
         self.config = config # Zapisujemy config dla dostępu do parametrów
@@ -205,27 +197,7 @@ class BlackholeEmbeddings(nn.Module):
         inputs_embeds: Optional[torch.Tensor] = None,
         past_key_values_length: int = 0,
     ) -> torch.Tensor: # Zwracamy JEDEN tensor, który łączy tekstowe i numeryczne
-        """
-        Przetwarza wejścia i generuje finalne osadzenia wejściowe dla Transformera.
 
-        Args:
-            input_ids (torch.Tensor): Tensory z ID tokenów ze strumienia tekstowego.
-                                      Kształt: (batch_size, sequence_length).
-            numeric_values (torch.Tensor): Tensory z rzeczywistymi wartościami liczbowymi.
-                                            Kształt: (batch_size, sequence_length).
-                                            Zawiera self.numeric_pad_value (torch.nan) dla pozycji nienumerycznych.
-            numeric_formats (torch.Tensor, optional): Tensory z ID formatów numerycznych.
-                                                     Kształt: (batch_size, sequence_length).
-                                                     Zawiera -1 dla pozycji nienumerycznych.
-            token_type_ids (torch.Tensor, optional): Tensory z ID typów tokenów (dla segmentów A/B).
-            position_ids (torch.Tensor, optional): Tensory z ID pozycji.
-            inputs_embeds (torch.Tensor, optional): Bezpośrednio podane osadzenia wejściowe.
-            past_key_values_length (int): Długość poprzednich kluczy/wartości dla generacji.
-
-        Returns:
-            torch.Tensor: Finalne osadzenia wejściowe dla Transformera.
-                          Kształt: (batch_size, sequence_length, hidden_size).
-        """
         input_shape = input_ids.size()
         seq_length = input_shape[1]
         device = input_ids.device
