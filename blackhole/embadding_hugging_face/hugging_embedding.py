@@ -17,33 +17,36 @@ class BlackholeConfig(PretrainedConfig):
         type_vocab_size: int = 2, # Typy tokenów (dla sekwencji A/B)
         layer_norm_eps: float = 1e-12,
         hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        hidden_act: str = "gelu", # <-- DODAJ TĘ LINIĘ
         pad_token_id: int = 1,    # Ustaw na rzeczywiste ID paddingu z Twojego tokenizer'a
         num_token_id: int = 5,    # Ustaw na rzeczywiste ID tokenu [NUM] z Twojego tokenizer'a
         # Nowe parametry dla zaawansowanych cech numerycznych
         numeric_feature_dims: dict = { # Wymiary dla poszczególnych typów cech (suma musi wynieść 96)
             # HEAVY LAYERS / Highly Informative Features (64 + 20 = 84 cechy)
-            "float64_binary_repr": 64,    # 64-bitowa reprezentacja IEEE 754 (najcięższa)
-            "digit_pos_0": 10,            # One-hot dla cyfry jedności (0-9)
-            "digit_pos_1": 10,            # One-hot dla cyfry dziesiątek (0-9)
+            "float64_binary_repr": 64,     # 64-bitowa reprezentacja IEEE 754 (najcięższa)
+            "digit_pos_0": 10,             # One-hot dla cyfry jedności (0-9)
+            "digit_pos_1": 10,             # One-hot dla cyfry dziesiątek (0-9)
 
             # LIGHT LAYERS / Simpler Informative Features (5 + 7 = 12 cech)
-            "log_value": 1,              # Logarytm z wartości bezwzględnej
-            "sign": 1,                   # Znak liczby (-1, 0, 1)
-            "exponent_base10": 1,        # Wykładnik potęgi 10 (rząd wielkości)
-            "num_total_digits": 1,       # Całkowita liczba cyfr (przed i po przecinku)
-            "num_decimal_places": 1,     # Liczba miejsc po przecinku
+            "log_value": 1,                # Logarytm z wartości bezwzględnej
+            "sign": 1,                     # Znak liczby (-1, 0, 1)
+            "exponent_base10": 1,          # Wykładnik potęgi 10 (rząd wielkości)
+            "num_total_digits": 1,         # Całkowita liczba cyfr (przed i po przecinku)
+            "num_decimal_places": 1,       # Liczba miejsc po przecinku
 
-            "is_integer_flag": 1,        # Czy liczba jest całkowita
-            "is_positive_flag": 1,       # Czy liczba jest dodatnia
-            "is_zero_flag": 1,           # Czy liczba jest równa 0
-            "is_negative_flag": 1,       # Czy liczba jest ujemna
-            "is_power_of_2_flag": 1,     # Czy jest potęgą 2
-            "format_type_int": 1,        # Czy format to integer (one-hot)
-            "format_type_float": 1,      # Czy format to float (one-hot)
+            "is_integer_flag": 1,          # Czy liczba jest całkowita
+            "is_positive_flag": 1,         # Czy liczba jest dodatnia
+            "is_zero_flag": 1,             # Czy liczba jest równa 0
+            "is_negative_flag": 1,         # Czy liczba jest ujemna
+            "is_power_of_2_flag": 1,       # Czy jest potęgą 2
+            "format_type_int": 1,          # Czy format to integer (one-hot)
+            "format_type_float": 1,        # Czy format to float (one-hot)
             # Suma wszystkich cech: 64 + 10 + 10 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 = 96
         },
         numeric_projection_intermediate_size_ratio: float = 0.5, # np. 0.5 * hidden_size
         numeric_embedding_fusion_type: str = "gating", # "add", "concat", "gating"
+        numeric_heavy_feature_freeze: bool = False,
         **kwargs,
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -54,6 +57,8 @@ class BlackholeConfig(PretrainedConfig):
         self.type_vocab_size = type_vocab_size
         self.layer_norm_eps = layer_norm_eps
         self.hidden_dropout_prob = hidden_dropout_prob
+        self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.hidden_act = hidden_act # <-- DODAJ TĘ LINIĘ
         self.num_token_id = num_token_id
 
         # Oblicz całkowitą liczbę wejściowych cech numerycznych
@@ -67,6 +72,7 @@ class BlackholeConfig(PretrainedConfig):
 
         self.numeric_projection_intermediate_size = int(hidden_size * numeric_projection_intermediate_size_ratio)
         self.numeric_embedding_fusion_type = numeric_embedding_fusion_type
+        self.numeric_heavy_feature_freeze = numeric_heavy_feature_freeze
 
 
 class BlackholeEmbeddings(nn.Module):
@@ -87,7 +93,6 @@ class BlackholeEmbeddings(nn.Module):
 
         # --- Zaawansowana warstwa do osadzania liczb ---
         # Ta sieć MLP będzie przekształcać rozbudowane cechy numeryczne w wektor osadzeń.
-        # Warstwy liniowe są domyślnie inicjowane jako float32, co jest standardem dla większości modeli.
         self.numeric_embedding_projection = nn.Sequential(
             nn.Linear(config.numeric_input_features, config.numeric_projection_intermediate_size),
             ACT2FN["gelu"], # Aktywacja GELU z Hugging Face
@@ -95,19 +100,14 @@ class BlackholeEmbeddings(nn.Module):
             nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps) # Normalizacja po projekcji
         )
 
-        # NIE KONWERTUJEMY numeric_embedding_projection NA DOUBLE TUTAJ
-        # Zamiast tego, wejście do tej warstwy będzie konwertowane na float32 w forward pass.
-
         # Mechanizm bramkowania (gating) dla fuzji osadzeń numerycznych z tekstowymi
         self.numeric_embedding_fusion_type = config.numeric_embedding_fusion_type
         if self.numeric_embedding_fusion_type == "gating":
-            # Te warstwy również pozostają w float32
             self.numeric_gate = nn.Linear(config.hidden_size * 2, config.hidden_size)
             self.gate_activation = nn.Sigmoid()
         elif self.numeric_embedding_fusion_type == "add":
             pass # Fuzja przez dodawanie, nie potrzebuje dodatkowych warstw
         elif self.numeric_embedding_fusion_type == "concat":
-            # Ta warstwa również pozostaje w float32
             self.concat_projection = nn.Linear(config.hidden_size * 2, config.hidden_size)
         else:
             raise ValueError(f"Nieznany typ fuzji numerycznej: {config.numeric_embedding_fusion_type}. Oczekiwano 'add', 'concat' lub 'gating'.")
@@ -121,6 +121,13 @@ class BlackholeEmbeddings(nn.Module):
             "position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)), persistent=False
         )
 
+        # --- Zamrażanie wagi dla 'ciężkich' cech numerycznych, jeśli włączone ---
+        if config.numeric_heavy_feature_freeze:
+            for param in self.numeric_embedding_projection.parameters():
+                param.requires_grad = False
+            print("Wagi numerycznej warstwy projekcyjnej zostały zamrożone.")
+
+
     def _get_numeric_features(self, values: torch.Tensor, formats: Optional[torch.Tensor]) -> torch.Tensor:
         """
         Przetwarza surowe wartości liczbowe i ich formaty na wejściowe cechy numeryczne
@@ -130,19 +137,17 @@ class BlackholeEmbeddings(nn.Module):
 
         Args:
             values (torch.Tensor): Tensor wartości numerycznych (tylko faktyczne liczby).
-                                   Powinien być typu torch.float64 dla precyzji binarnej.
+                                    Powinien być typu torch.float64 dla precyzji binarnej.
             formats (torch.Tensor, optional): Tensor z ID formatów numerycznych
-                                           (0: int, 1: float, 2: scientific, 3: hexadecimal).
+                                            (0: int, 1: float, 2: scientific, 3: hexadecimal).
         Returns:
             torch.Tensor: Złączone cechy numeryczne, TYPU torch.float32.
-                          Kształt: (num_numeric_tokens, total_features).
+                            Kształt: (num_numeric_tokens, total_features).
         """
         features_list = []
         device = values.device
 
         # WAŻNE: Upewniamy się, że wartości są w float64 dla dokładnej reprezentacji bitowej
-        # Konwersja na double (float64) jest bezpieczna i zapewnia maksymalną precyzję
-        # podczas ekstrakcji cech, zwłaszcza dla float64_binary_repr.
         if values.dtype != torch.float64:
             values = values.double()
 
@@ -206,9 +211,6 @@ class BlackholeEmbeddings(nn.Module):
 
         # 3.4. Całkowita liczba cyfr w liczbie (num_total_digits)
         if self.config.numeric_feature_dims.get("num_total_digits", 0) > 0:
-            # Uwaga: użycie pętli i konwersji na string jest nieoptymalne dla GPU.
-            # Lepszym podejściem byłoby wstępne obliczenie tego w tokenizerze i przekazanie.
-            # Na potrzeby funkcjonalności utrzymujemy obecne podejście.
             total_digits_tensor = torch.tensor([
                 sum(1 for char in str(val.item()).replace('.', '').replace('-', '').lower().split('e')[0] if char.isdigit())
                 for val in values

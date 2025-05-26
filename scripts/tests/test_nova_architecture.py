@@ -223,7 +223,7 @@ def test_masked_lm_model(tokenizer, config):
     # Znajdź pozycję liczby i zamaskuj ją
     mask_idx = -1
     for i, token in enumerate(tokens):
-        if tokenizer._is_number(token): # Używamy wewnętrznej metody do identyfikacji liczby
+        if tokenizer.is_numeric_token(token): # Lub zostawić _is_number, jeśli dodałeś ostrzeżenie
             mask_idx = i
             break
     
