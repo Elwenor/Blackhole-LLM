@@ -1,0 +1,66 @@
+{
+  "additional_special_tokens": [
+    {
+      "content": "[UNK]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[CLS]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[SEP]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[PAD]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[MASK]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[NUM]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[CAP]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[ALLCAPS]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    }
+  ],
+  "bos_token": "<s>",
+  "cls_token": "[CLS]",
+  "mask_token": "[MASK]",
+  "pad_token": "[PAD]",
+  "sep_token": "[SEP]",
+  "unk_token": "[UNK]"
+}
