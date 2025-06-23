@@ -15,14 +15,16 @@ MAX_SEQ_LEN = 128
 
 # Training Hyperparameters
 NUM_EPOCHS = 1
-# [POPRAWKA] Zmniejsz BATCH_SIZE, jeśli wystąpi błąd "Out of Memory" na GPU z małą ilością VRAM.
-# Dla GTX 650 bezpieczniej zacząć od 16 lub 32.
+
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
 
-# Data Loading and Sampling
-DATA_SAMPLE_PERCENTAGE = 0.2
-EVAL_SAMPLE_PERCENTAGE = 0.2
+DETERMINED_NUMERIC_FEATURE_DIM = 7
+
+# TU SĄ ILE DANYCH CHCEMY !!!
+
+DATA_SAMPLE_PERCENTAGE = 0.8
+EVAL_SAMPLE_PERCENTAGE = 0.8
 
 # Display and Debug
 NUM_EXAMPLES_TO_DISPLAY = 3 # Number of examples to show predictions for after each epoch

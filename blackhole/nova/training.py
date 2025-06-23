@@ -9,7 +9,7 @@ from tqdm import tqdm
 from .loss_functions import focal_loss, mse_loss_for_numerical_features
 
 # Remove this line, as predict_and_decode_answer is not used in train_step
-# from blackhole.nova.prediction import predict_and_decode_answer 
+# from blackhole.nova.prediction import predict_and_decode_answer
 
 def train_step(model, batch, optimizer, scheduler, focal_loss_fn, mse_loss_fn, vocab, device, clip_grad=1.0):
     model.train()
@@ -63,8 +63,5 @@ def train_step(model, batch, optimizer, scheduler, focal_loss_fn, mse_loss_fn, v
     if scheduler is not None:
         scheduler.step()
 
-    return {
-        'ce_loss': ce_loss.item(),
-        'numeric_loss': numeric_loss.item(),
-        'total_loss': loss.item()
-    }
+    # Return only the total loss tensor
+    return loss

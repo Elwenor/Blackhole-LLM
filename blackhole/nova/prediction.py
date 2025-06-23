@@ -1,3 +1,4 @@
+# File: blackhole/nova/prediction.py
 import torch
 import re
 import math # Make sure math is imported for isclose
@@ -92,11 +93,20 @@ def predict_and_decode_answer(model, encoder_token_ids, encoder_numeric_features
 
     # Post-processing: Reconstruct the answer string from generated tokens and numbers
     final_decoded_answers = []
+    final_predicted_numbers = [] # NEW: List to store extracted numbers
     for i in range(batch_size):
         predicted_answer_tokens = []
         current_generated_num_idx = 0
         # Filter out the 'STOP_DECODING' signal before post-processing
         temp_generated_tokens = [tok for tok in generated_tokens_list[i] if tok != 'STOP_DECODING']
+
+        # NEW: Extract the primary predicted number for this example
+        predicted_num_for_example = None
+        for j, token in enumerate(temp_generated_tokens):
+            if token == '<|num|>':
+                if current_generated_num_idx < len(generated_num_values_list[i]):
+                    predicted_num_for_example = generated_num_values_list[i][current_generated_num_idx]
+                break # Take the first number found for simplicity
 
         k = 0
         while k < len(temp_generated_tokens):
@@ -135,5 +145,6 @@ def predict_and_decode_answer(model, encoder_token_ids, encoder_numeric_features
         predicted_answer_cleaned = re.sub(r'\s+', ' ', predicted_answer_cleaned).strip() # Consolidate multiple spaces and strip leading/trailing
 
         final_decoded_answers.append(predicted_answer_cleaned)
+        final_predicted_numbers.append(predicted_num_for_example) # NEW: Store the extracted number
 
-    return final_decoded_answers
+    return final_decoded_answers, final_predicted_numbers # NEW: Return both lists

@@ -1,0 +1,65 @@
+
+DLA 0.01 DANYCH!
+
+--- Example Predictions (Validation Set) ---
+
+Przykład 1:
+Pytanie: What team had the best start ever in the NFL?
+Oryginalna odpowiedź: Carolina Panthers
+Przewidziana odpowiedź: onlineonlineonlinejunctionssupremepriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriest
+Przewidziana liczba (jeśli dotyczy): None
+
+Przykład 2:
+Pytanie: At what address did Goldenson secure a new headquarters for ABC?
+Oryginalna odpowiedź: 1330 Avenue of the Americas in Manhattan
+Przewidziana odpowiedź: onlineonlineonlinejunctionssupremepriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriest
+Przewidziana liczba (jeśli dotyczy): None
+
+Przykład 3:
+Pytanie: In 1890, who did the university decide to team up with?
+Oryginalna odpowiedź: several regional colleges and universities
+Przewidziana odpowiedź: onlineonlineonlinejunctionssupremepriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriestpriest
+Przewidziana liczba (jeśli dotyczy): None
+
+Training complete.
+Model saved to blackhole_model.pth
+
+
+DLA 0.8 DANYCH!
+
+Preprocessing datasets...
+Map (num_proc=16): 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 70079/70079 [00:16<00:00, 4344.37 examples/s]
+Map (num_proc=16): 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 8456/8456 [00:13<00:00, 615.76 examples/s]
+Starting training...
+Epoch 1/1 Training:   0%|                                                                                                                                                                                          | 0/2190 [00:00<?, ?it/s]C:\Users\Aleksander\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\functional.py:5962: UserWarning: Support for mismatched key_padding_mask and attn_mask is deprecated. Use same type for both instead.
+  warnings.warn(
+Epoch 1/1 Training: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 2190/2190 [2:01:56<00:00,  3.34s/it, loss=40143.9219]
+Epoch 1 finished. Average Training Loss: 1084177584936147038323779383066624.0000
+Starting evaluation after Epoch 1...
+Evaluating: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 265/265 [01:53<00:00,  2.33it/s]
+Validation Exact Match: 1.00
+Validation Numerical Accuracy: 0.00
+
+--- Example Predictions (Validation Set) ---
+
+Przykład 1:
+Pytanie: What can't Parliament do that causes equality and democracy to be deficient?
+Oryginalna odpowiedź: cannot initiate legislation against the Commission's wishes
+Przewidziana odpowiedź: 
+Przewidziana liczba (jeśli dotyczy): None
+
+Przykład 2:
+Pytanie: What did DECnet originally do 
+Oryginalna odpowiedź: connect two PDP-11 minicomputers
+Przewidziana odpowiedź: 
+Przewidziana liczba (jeśli dotyczy): None
+
+Przykład 3:
+Pytanie: What place had the Norman Arab architectural style?
+Oryginalna odpowiedź: Sicily
+Przewidziana odpowiedź: 
+Przewidziana liczba (jeśli dotyczy): None
+
+Training complete.
+Model saved to blackhole_model.pth
+PS C:\Users\Aleksander\Documents\GitHub\Blackhole-LLM\scripts\training> 
