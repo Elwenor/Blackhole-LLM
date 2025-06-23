@@ -31,7 +31,7 @@ def prepare_inputs(tokens, number_map, dim=128):
 
     for idx, (val, typ, raw) in number_map.items():
         if idx < len(tokens): # Ensure the index is within bounds
-            features = number_embedding_features(val, dim=dim)
+            features = number_embedding_features(val, typ, dim=dim)
             numeric_features_tensor[idx] = torch.tensor(features, dtype=torch.float32)
 
     return token_ids.unsqueeze(0), numeric_features_tensor.unsqueeze(0), vocab

@@ -78,6 +78,15 @@ def number_embedding_features(val: float, typ: str, dim: int = 128) -> torch.Ten
     return torch.tensor(features, dtype=torch.float) # Output tensor can still be float32, but input to log10 must be float64
 
 def decode_number_from_features(features: torch.Tensor) -> float:
+    # KLUCZOWA ZMIANA: Upewnij się, że 'features' jest tensorem PyTorcha
+    if not isinstance(features, torch.Tensor):
+        # Zakładamy, że jeśli nie jest tensorem, to jest numpy.ndarray
+        # Konwertujemy na tensor PyTorcha. Domyślnie na CPU.
+        features = torch.from_numpy(features) 
+        # Opcjonalnie, jeśli chcesz, aby tensor był na tym samym urządzeniu co model podczas ewaluacji,
+        # możesz przekazać 'device' do tej funkcji i użyć .to(device).
+        # Na razie pozostawienie na CPU jest bezpieczne, ponieważ operacje dekodowania nie są intensywne GPU.
+
     # Sprawdź, czy to cecha paddingu
     if torch.all(features == -2.0):
         return float('nan') # Zwróć NaN dla paddingu
@@ -95,6 +104,7 @@ def decode_number_from_features(features: torch.Tensor) -> float:
         return float('nan')
 
     # Upewniamy się, że tensor jest na CPU i nie śledzi gradientów, aby uniknąć błędów
+    # Ta linia jest nadal dobra, ale teraz 'features' jest już tensorem
     features_processed = features.clone().detach().cpu() 
 
     # Poprawka: Upewnij się, że minimalna długość jest zawsze 92 dla pełnego dekodowania.
@@ -236,7 +246,6 @@ def decode_number_from_features(features: torch.Tensor) -> float:
     else:
         return abs(final_val_candidate) * final_sign
 
-# --- Klasy PyTorch do embeddingów ---
 
 class TokenEmbedding(nn.Module):
     def __init__(self, vocab_size: int, embedding_dim: int = 128):

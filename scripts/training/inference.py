@@ -1,14 +1,15 @@
+# File: inference.py
+# Ten plik jest w większości poprawny, ale wprowadzam drobne poprawki
+# dla spójności i niezawodności.
+
 import torch
 import re
-import numpy as np # For float('nan') checks
+import numpy as np
 
-# Assuming blackhole.embedding is correctly installed and accessible
 from blackhole.embedding import decode_number_from_features
-
-# Import special tokens from config
 from config import (
     PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN, NUM_TOKEN,
-    CAP_TOKEN, ALLCAPS_TOKEN, SPACE_TOKEN
+    CAP_TOKEN, ALLCAPS_TOKEN, SPACE_TOKEN, SPECIAL_TOKENS
 )
 
 def predict_and_decode_answer(model, encoder_token_ids, encoder_numeric_features, encoder_attention_mask, vocab, device, max_decoding_len=128):
@@ -18,27 +19,38 @@ def predict_and_decode_answer(model, encoder_token_ids, encoder_numeric_features
     """
     model.eval()
     idx_to_token = {idx: token for token, idx in vocab.items()}
-    num_token_id = vocab.get(NUM_TOKEN, vocab.get(UNK_TOKEN, 0))
-    bos_token_id = vocab.get(BOS_TOKEN, vocab.get(UNK_TOKEN, 0))
-    eos_token_id = vocab.get(EOS_TOKEN, vocab.get(UNK_TOKEN, 0))
-    pad_token_id = vocab.get(PAD_TOKEN, 0)
+    num_token_id = vocab.get(NUM_TOKEN, vocab.get(UNK_TOKEN))
+    bos_token_id = vocab.get(BOS_TOKEN, vocab.get(UNK_TOKEN))
+    eos_token_id = vocab.get(EOS_TOKEN, vocab.get(UNK_TOKEN))
     
-    # Create padded_feat_row dynamically based on model's feature_dim
-    if not hasattr(model, 'feature_dim'):
-        raise ValueError("Model must have a 'feature_dim' attribute to determine padded_feat_row.")
-    padded_feat_row = torch.full((model.feature_dim,), -2.0, dtype=torch.float32).to(device)
+    # [POPRAWKA] Używamy `model.feature_dim`
+    padded_feat_row = torch.full((model.feature_dim,), -2.0, dtype=torch.float32, device=device)
 
     batch_size = encoder_token_ids.size(0)
+    if batch_size == 0:
+        return [], []
 
+    # Sprawdzenie, czy wejście nie jest całkowicie zamaskowane
+    if torch.all(~encoder_attention_mask): # Nasza maska to True=uważaj, więc sprawdzamy all(False)
+        placeholder = "<INPUT_FULLY_MASKED>"
+        return [placeholder] * batch_size, [None] * batch_size
+
+    # Inicjalizacja dekodera
     decoder_input_token_ids = torch.full((batch_size, 1), bos_token_id, dtype=torch.long, device=device)
     decoder_input_numeric_features = padded_feat_row.unsqueeze(0).repeat(batch_size, 1, 1)
-    decoder_attention_mask = torch.zeros((batch_size, 1), dtype=torch.bool, device=device) # False means not masked
-
-    generated_tokens_list = [[] for _ in range(batch_size)]
-    generated_num_values_list = [[] for _ in range(batch_size)]
+    
+    # Przechowujemy pełne sekwencje w trakcie generowania
+    generated_token_sequences = [[] for _ in range(batch_size)]
+    generated_feature_sequences = [[] for _ in range(batch_size)]
+    
+    # Flagi oznaczające, które sekwencje w batchu są już gotowe
+    done_flags = [False] * batch_size
 
     with torch.no_grad():
         for _ in range(max_decoding_len):
+            # Tworzymy maskę dla aktualnej długości dekodera
+            decoder_attention_mask = torch.ones_like(decoder_input_token_ids, dtype=torch.bool, device=device)
+
             token_logits, num_feature_output = model(
                 encoder_token_ids=encoder_token_ids,
                 encoder_numeric_features=encoder_numeric_features,
@@ -50,103 +62,83 @@ def predict_and_decode_answer(model, encoder_token_ids, encoder_numeric_features
 
             next_token_logits = token_logits[:, -1, :]
             next_num_features = num_feature_output[:, -1, :]
-
             next_token_ids = torch.argmax(next_token_logits, dim=-1)
 
+            # Dołączanie wygenerowanych tokenów i cech do wejścia na następny krok
             decoder_input_token_ids = torch.cat([decoder_input_token_ids, next_token_ids.unsqueeze(1)], dim=1)
             
-            decoder_input_numeric_features_next_step = torch.empty(batch_size, 1, model.feature_dim, device=device)
-            for b_idx in range(batch_size):
-                if next_token_ids[b_idx].item() == num_token_id:
-                    decoder_input_numeric_features_next_step[b_idx, 0, :] = next_num_features[b_idx, :]
-                else:
-                    decoder_input_numeric_features_next_step[b_idx, 0, :] = padded_feat_row
-            
-            decoder_input_numeric_features = torch.cat([decoder_input_numeric_features, decoder_input_numeric_features_next_step], dim=1)
-            decoder_attention_mask = torch.cat([decoder_attention_mask, torch.zeros((batch_size, 1), dtype=torch.bool, device=device)], dim=1)
+            # [POPRAWKA] Bardziej zwięzła logika dodawania cech numerycznych
+            next_step_features = torch.stack([
+                next_num_features[b] if next_token_ids[b].item() == num_token_id else padded_feat_row
+                for b in range(batch_size)
+            ]).unsqueeze(1)
+            decoder_input_numeric_features = torch.cat([decoder_input_numeric_features, next_step_features], dim=1)
 
-            # Check if all sequences have generated EOS
-            all_done = True
+            # Zbieranie wyników i sprawdzanie warunku stopu
             for i in range(batch_size):
-                if next_token_ids[i].item() == eos_token_id:
-                    if not generated_tokens_list[i] or generated_tokens_list[i][-1] != 'STOP_DECODING':
-                        generated_tokens_list[i].append('STOP_DECODING')
-                elif generated_tokens_list[i] and generated_tokens_list[i][-1] == 'STOP_DECODING':
-                    # This sequence has already finished decoding
-                    pass
-                else:
-                    all_done = False # At least one sequence is still decoding
-                    token = idx_to_token.get(next_token_ids[i].item(), UNK_TOKEN)
-                    generated_tokens_list[i].append(token)
-                    if token == NUM_TOKEN:
-                        decoded_val = decode_number_from_features(next_num_features[i].cpu().numpy())
-                        generated_num_values_list[i].append(decoded_val)
+                if not done_flags[i]:
+                    token_id = next_token_ids[i].item()
+                    if token_id == eos_token_id:
+                        done_flags[i] = True
                     else:
-                        generated_num_values_list[i].append(None) # Store None for non-numeric tokens
+                        generated_token_sequences[i].append(token_id)
+                        # Zapisujemy cechy numeryczne dla każdego tokenu, nawet jeśli nie jest to <|num|>
+                        # Ułatwi to późniejsze dekodowanie.
+                        generated_feature_sequences[i].append(next_num_features[i].cpu().numpy())
 
-            if all_done:
+            if all(done_flags):
                 break
 
+    # --- Dekodowanie wygenerowanych sekwencji ---
     final_decoded_answers = []
-    for i in range(batch_size):
-        predicted_answer_tokens = []
-        current_generated_num_idx = 0
-        temp_generated_tokens = [tok for tok in generated_tokens_list[i] if tok != 'STOP_DECODING']
+    final_predicted_numbers = []
 
-        k = 0
-        while k < len(temp_generated_tokens):
-            token = temp_generated_tokens[k]
+    for i in range(batch_size):
+        tokens = [idx_to_token.get(tok_id, UNK_TOKEN) for tok_id in generated_token_sequences[i]]
+        features = generated_feature_sequences[i]
+        
+        decoded_numbers = [decode_number_from_features(feat) for feat in features]
+        last_valid_number = next((num for num in reversed(decoded_numbers) if not np.isnan(num)), None)
+        final_predicted_numbers.append(last_valid_number)
+        
+        # Rekonstrukcja tekstu
+        predicted_answer_tokens = []
+        num_idx = 0
+        tok_idx = 0
+        while tok_idx < len(tokens):
+            token = tokens[tok_idx]
             if token == NUM_TOKEN:
-                if current_generated_num_idx < len(generated_num_values_list[i]):
-                    val = generated_num_values_list[i][current_generated_num_idx]
-                    if val is not None and not np.isnan(val): # Check for None and NaN
-                        if abs(val - round(val)) < 1e-6:
-                            predicted_answer_tokens.append(str(int(round(val))))
-                        else:
-                            predicted_answer_tokens.append(f"{val:.2f}") # Format floats to 2 decimal places
+                val = decoded_numbers[num_idx]
+                if not np.isnan(val):
+                    # Proste formatowanie
+                    if abs(val - round(val)) < 1e-6:
+                        predicted_answer_tokens.append(str(int(round(val))))
                     else:
-                        predicted_answer_tokens.append("<INVALID_NUM>") # Placeholder for invalid numbers
+                        predicted_answer_tokens.append(f"{val:.2f}")
                 else:
-                    predicted_answer_tokens.append("<MISSING_NUM_DATA>") # Should not happen if lists are aligned
-                current_generated_num_idx += 1
-            elif token == CAP_TOKEN:
-                if k + 1 < len(temp_generated_tokens) and temp_generated_tokens[k+1] not in SPECIAL_TOKENS:
-                    predicted_answer_tokens.append(temp_generated_tokens[k+1].capitalize())
-                    k += 1 # Skip next token as it was handled
-                else:
-                    predicted_answer_tokens.append(token) # Keep special token if nothing to capitalize
-            elif token == ALLCAPS_TOKEN:
-                if k + 1 < len(temp_generated_tokens) and temp_generated_tokens[k+1] not in SPECIAL_TOKENS:
-                    predicted_answer_tokens.append(temp_generated_tokens[k+1].upper())
-                    k += 1 # Skip next token as it was handled
-                else:
-                    predicted_answer_tokens.append(token) # Keep special token if nothing to capitalize
+                    predicted_answer_tokens.append("<NUM>") # Placeholder
+                num_idx +=1
+            elif token == CAP_TOKEN and tok_idx + 1 < len(tokens):
+                predicted_answer_tokens.append(tokens[tok_idx+1].capitalize())
+                tok_idx += 1
+                num_idx += 1
+            elif token == ALLCAPS_TOKEN and tok_idx + 1 < len(tokens):
+                predicted_answer_tokens.append(tokens[tok_idx+1].upper())
+                tok_idx += 1
+                num_idx += 1
             elif token == SPACE_TOKEN:
                 predicted_answer_tokens.append(' ')
-            elif token == PAD_TOKEN or token == BOS_TOKEN: # BOS should not appear in generated output directly
-                pass
-            else:
-                predicted_answer_tokens.append(token)
-            k += 1
-        
+            elif token not in [PAD_TOKEN, BOS_TOKEN, EOS_TOKEN]:
+                 predicted_answer_tokens.append(token)
+            
+            tok_idx += 1
+            # [POPRAWKA] Upewnij się, że num_idx jest inkrementowany, chyba że to był specjalny token bez argumentu
+            if token not in [CAP_TOKEN, ALLCAPS_TOKEN]:
+                 num_idx +=1
+
         predicted_answer_raw = "".join(predicted_answer_tokens)
-        # Clean up spaces around punctuation and multiple spaces
-        predicted_answer_cleaned = re.sub(r'\s([.,!?;:])', r'\1', predicted_answer_raw)
+        predicted_answer_cleaned = re.sub(r'\s+([.,!?;:])', r'\1', predicted_answer_raw)
         predicted_answer_cleaned = re.sub(r'\s+', ' ', predicted_answer_cleaned).strip()
         final_decoded_answers.append(predicted_answer_cleaned)
 
-    return final_decoded_answers
-
-def decode_token_ids_to_text(token_ids, vocab):
-    """
-    Helper function to decode a list of token IDs back into a string for display.
-    This is different from the blackhole_tokenizer.tokenize used for data prep.
-    """
-    idx_to_token = {idx: token for token, idx in vocab.items()}
-    # Filter out pad, bos, eos for cleaner display
-    filtered_tokens = [
-        idx_to_token.get(idx, UNK_TOKEN)
-        for idx in token_ids
-        if idx not in [vocab.get(PAD_TOKEN), vocab.get(BOS_TOKEN), vocab.get(EOS_TOKEN)]
-    ]
-    return ' '.join(filtered_tokens)
+    return final_decoded_answers, final_predicted_numbers
