@@ -111,7 +111,6 @@ First-run tests were conducted on a compact 25-million-parameter model using a v
 2.  **A Critical Instability Highlighted**: The primary goal of these initial runs was to test model stability, which revealed a major challenge with the numerical loss. The total loss is a weighted sum of the language model loss and the numerical loss, calculated by the formula:
 
     $$ \text{total\_loss} = \text{total\_loss}_{\text{LM}} + (\text{self.config.numeric\_loss\_weight} \cdot \text{numeric\_loss}) $$
-    While the language model loss (`LM Loss`) showed a healthy, downward trend, the `numeric_loss` was plagued by **extreme spikes and instability**. This is starkly visible in the Epoch 1 training summary:
 
     While the language model loss (`LM Loss`) showed a healthy, downward trend, the `numeric_loss` was plagued by **extreme spikes and instability**. This is starkly visible in the Epoch 1 training summary:
 
