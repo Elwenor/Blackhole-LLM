@@ -1,6 +1,6 @@
 # Blackhole-LLM: A Groundbreaking Architecture for Next-Generation LLMs
 
-Welcome to **Blackhole-LLM** – my experimental venture into the realm of **advanced Large Language Model (LLM) architectures**\! Built upon `PyTorch`, this project aims to revolutionize how LLMs process both **textual and numerical data**, with a strong emphasis on robust mathematical reasoning, intelligent handling of structured inputs, and an overarching commitment to system modularity.
+Welcome to **Blackhole-LLM** – my experimental venture into the realm of **advanced Large Language Model (LLM) architectures**! Built upon `PyTorch`, this project aims to revolutionize how LLMs process both **textual and numerical data**, with a strong emphasis on robust mathematical reasoning, intelligent handling of structured inputs, and an overarching commitment to system modularity.
 
 ---
 
@@ -10,9 +10,9 @@ From its inception, Blackhole-LLM is being developed with a clear goal: **to sea
 
 ---
 
-> [\!WARNING]
+> [!WARNING]
 >
-> ### ⚠️ Project Status - Important Information\! ⚠️
+> ### ⚠️ Project Status - Important Information! ⚠️
 >
 > This project is currently in an **active architectural development phase**. While my **key innovative components—the custom tokenizer system and the numerical embeddings module—are functional and being actively refined**, their design and implementation are still subject to **ongoing improvements and potential significant changes**. This means their current state, though operational, is **experimental and not yet optimized for general utility or stability.**
 >
@@ -60,20 +60,35 @@ These modules are responsible for creating embeddings, including my advanced sys
 
 * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
 
-* **Choice of Normalization and Loss Function**: Based on our extensive internal simulations and benchmarks, we have selected the **Signed Log + Min-Max Normalization** as the optimal method for transforming numerical values into embedding vectors. This choice was driven by a key challenge: preventing extreme numerical values from destabilizing the training process.
+* **Choice of Normalization and Loss Function**: Based on our extensive internal simulations and benchmarks, we have selected **P6: Quantile Normalization** as the optimal method for transforming numerical values into embedding vectors. This choice was driven by a key challenge: preventing extreme numerical values from destabilizing the training process while ensuring **extremely high precision and reconstruction accuracy**.
 
-    * **Formula**: This approach applies a signed logarithmic transformation to compress the range of values while preserving their sign. The transformed values are then scaled using Min-Max normalization. The formula for the transformation is as follows:
-        $$f = \text{sgn}(x) \cdot \log_{10}(|x| + 1)$$
-        $$f' = \frac{f - f_{min}}{f_{max} - f_{min}}$$
+    * **Formulas of considered normalizations**:
+        * **P1 (Raw)**: No normalization.
+          $$x' = x$$
+        * **P2 (Z-Score)**: Standardizes values.
+          $$x' = \frac{x - \mu}{\sigma}$$
+        * **P3 (Min-Max)**: Scales values to a range of 0 to 1.
+          $$x' = \frac{x - x_{min}}{x_{max} - x_{min}}$$
+        * **P4 (Log + Min-Max)**: Applies a logarithmic transformation.
+          $$f = \log_{10}(x + c)$$  $$f' = \frac{f - f_{min}}{f_{max} - f_{min}}$$
+        * **P5 (Signed Log + Min-Max)**: Applies a signed logarithmic transformation.
+          $$f = \text{sgn}(x) \cdot \log_{10}(|x| + 1)$$  $$f' = \frac{f - f_{min}}{f_{max} - f_{min}}$$
+        * **P6 (Quantile)**: Maps values to percentiles.
+          $$q = F(x) = P(X \leq x)$$  $$x' = q$$
+        * **P7 (Quantile + Signed Log)**: A combination of quantile mapping and signed logarithmic transformation.
+          $$f = \text{sgn}(x) \cdot \log_{10}(|x| + 1)$$  $$f' = F(f) = P(F \leq f)$$
 
-    * **Why Signed Log + Min-Max Normalization is the Best Choice**:
-        * **Robustness**: Our simulations showed that this method consistently achieves a very low cumulative loss across a wide range of values—from extreme magnitudes (`1e+9`, `1e+12`) to fractional, negative, and zero values. Unlike simpler normalizations, it effectively prevents feature values from dominating the training process.
-        * **Computational Efficiency**: While not the fastest, its computational complexity is far superior to quantile-based methods (e.g., (Quantile), (Quantile + Signed Log)), making it a highly practical choice for large-scale training and real-time inference. It offers an excellent balance between performance and computational cost.
-        * **High Reconstructibility**: The chosen method allows for the accurate reconstruction of the original numerical value from its embedding, which is crucial for tasks requiring precise outputs (e.g., mathematical reasoning, data generation).
-        * **Superiority over alternatives**:
-            * **Raw and Z-Score**: These methods struggle with numerical stability, leading to huge loss values for extreme inputs.
-            * **Min-Max**: While fast, it is highly sensitive to outliers, which can skew the entire feature range.
-            * **Quantile-based**: Although stable, these methods are computationally expensive during inference, as they require a lookup table or a full dataset scan.
+    * **Why P6: Quantile Normalization Was Chosen**:
+    After comprehensive testing, **P6: Quantile Normalization emerged as the clear winner.** While other methods like P1, P2, and P3 struggled with numerical stability and were highly sensitive to outliers, our simulations showed that they would lead to training instability. Log-based methods (P4, P5) performed much better in terms of stability, but they introduced small yet unacceptable reconstruction errors, which is critical for a model designed for precise mathematical tasks.
+
+    **Quantile Normalization (P6)**, despite being computationally more expensive during inference, offers unparalleled stability and, crucially, **almost perfect reconstruction of the original numerical value**. The minimal increase in cumulative loss in some scenarios is a small price to pay for the ability to maintain perfect data integrity, which is essential for accurate mathematical reasoning.
+
+    * **Examples of P6's Stability and Accuracy**:
+        * **Value: `1e+12`**: This extreme value causes massive loss in simpler models (e.g., Raw: `1.66e+24`), but with P6, the **loss is a stable `2.77e+0`**, and the reconstructed value has a **zero error**.
+        * **Value: `-500000`**: Again, this large negative value destabilizes most methods, but P6 maintains a **low loss of `2.39e+0`** and **zero reconstruction error**.
+        * **Value: `100`**: For a standard integer, P6 achieves the **lowest loss of all tested methods (`1.03e+0`)** and **perfect reconstruction**.
+
+    This confirms that the choice of P6 offers the optimal balance between performance and the critical need for a stable training process and high-precision outputs, which is the core of the Blackhole-LLM architecture.
 
     * **Loss Function**: For the numeric prediction head, we employ the **Mean Squared Error (MSE)** loss, which measures the squared difference between the predicted and target numeric embeddings, ensuring the model learns to represent numerical values accurately.
 
