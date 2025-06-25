@@ -47,12 +47,12 @@ My Blackhole-LLM project consists of several key packages and scripts that colle
       * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/TOKENIZER.md)
   * **`blackhole/embedding/`**: These modules are responsible for creating embeddings, including my advanced system for numerical data that transforms numbers into vectors understandable by the model.
       * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
-    * **Choice of Normalization and Loss Function**: Based on our extensive internal simulations and benchmarks, we have selected the **Signed Log + Min-Max Normalization (Approach P5)** as the optimal method for transforming numerical values into embedding vectors.
+      * **Choice of Normalization and Loss Function**: Based on our extensive internal simulations and benchmarks, we have selected the **Signed Log + Min-Max Normalization (Approach P5)** as the optimal method for transforming numerical values into embedding vectors. This choice was driven by a key challenge: preventing extreme numerical values from destabilizing the training process.
         * **Formula**: This approach applies a signed logarithmic transformation to compress the range of values while preserving their sign. The transformed values are then scaled using Min-Max normalization. The formula for the transformation is as follows:
             $$f = \text{sgn}(x) \cdot \log_{10}(|x| + 1)$$
             $$f' = \frac{f - f_{min}}{f_{max} - f_{min}}$$
         * **Why P5 is the Best Choice**:
-            * **Robustness**: Our simulations showed that this method consistently achieves a very low cumulative loss across a wide range of values—from extreme magnitudes (`1e+9`, `1e+12`) to fractional, negative, and zero values. Unlike Raw or Z-Score normalization, it effectively prevents feature values from dominating the training process, a key problem we solved with this approach.
+            * **Robustness**: Our simulations showed that this method consistently achieves a very low cumulative loss across a wide range of values—from extreme magnitudes (`1e+9`, `1e+12`) to fractional, negative, and zero values. Unlike simpler normalizations, it effectively prevents feature values from dominating the training process.
             * **Computational Efficiency**: While not the fastest, its computational complexity is far superior to quantile-based methods (e.g., P6, P7), making it a highly practical choice for large-scale training and real-time inference. It offers an excellent balance between performance and computational cost.
             * **High Reconstructibility**: The chosen method allows for the accurate reconstruction of the original numerical value from its embedding, which is crucial for tasks requiring precise outputs (e.g., mathematical reasoning, data generation).
             * **Superiority over alternatives**:
@@ -60,7 +60,7 @@ My Blackhole-LLM project consists of several key packages and scripts that colle
                 * **Min-Max**: While fast, it is highly sensitive to outliers, which can skew the entire feature range.
                 * **Quantile-based**: Although stable, these methods are computationally expensive during inference, as they require a lookup table or a full dataset scan.
         * **Loss Function**: For the numeric prediction head, we employ the **Mean Squared Error (MSE)** loss, which measures the squared difference between the predicted and target numeric embeddings, ensuring the model learns to represent numerical values accurately.
-  * **`blackhole/nova/`**: This is the designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
+  * **`blackhole/nova/`**: This is the designated location for the core language model architecture and training-related modules (e.g., a Transformer class and training scripts). It integrates tokens and numerical embeddings to form the complete training pipeline.
   * **`scripts/`**: This directory contains various scripts for project management, including:
       * Unit tests (`scripts/tests/`).
       * Benchmark scripts (`scripts/benchmarks/`).
