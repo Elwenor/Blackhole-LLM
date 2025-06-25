@@ -65,18 +65,25 @@ These modules are responsible for creating embeddings, including my advanced sys
     * **Formulas of considered normalizations**:
         * **P1 (Raw)**: No normalization.
           $$x' = x$$
+
         * **P2 (Z-Score)**: Standardizes values.
           $$x' = \frac{x - \mu}{\sigma}$$
+
         * **P3 (Min-Max)**: Scales values to a range of 0 to 1.
           $$x' = \frac{x - x_{min}}{x_{max} - x_{min}}$$
+
         * **P4 (Log + Min-Max)**: Applies a logarithmic transformation.
           $$f = \log_{10}(x + c)$$  $$f' = \frac{f - f_{min}}{f_{max} - f_{min}}$$
+
         * **P5 (Signed Log + Min-Max)**: Applies a signed logarithmic transformation.
           $$f = \text{sgn}(x) \cdot \log_{10}(|x| + 1)$$  $$f' = \frac{f - f_{min}}{f_{max} - f_{min}}$$
+
         * **P6 (Quantile)**: Maps values to percentiles.
           $$q = F(x) = P(X \leq x)$$  $$x' = q$$
+
         * **P7 (Quantile + Signed Log)**: A combination of quantile mapping and signed logarithmic transformation.
           $$f = \text{sgn}(x) \cdot \log_{10}(|x| + 1)$$  $$f' = F(f) = P(F \leq f)$$
+          
 
     * **Why P6: Quantile Normalization Was Chosen**:
     After comprehensive testing, **P6: Quantile Normalization emerged as the clear winner.** While other methods like P1, P2, and P3 struggled with numerical stability and were highly sensitive to outliers, our simulations showed that they would lead to training instability. Log-based methods (P4, P5) performed much better in terms of stability, but they introduced small yet unacceptable reconstruction errors, which is critical for a model designed for precise mathematical tasks.
