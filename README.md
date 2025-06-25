@@ -98,11 +98,11 @@ These modules are responsible for creating embeddings, including the advanced sy
 
     * **Loss Function**: For the numeric prediction head, the **Mean Squared Error (MSE)** loss is employed, which measures the squared difference between the predicted and target numeric embeddings, ensuring the model learns to represent numerical values accurately.
 
-#### `blackhole/nova/` - The Core Model Architecture
+### **`blackhole/nova/` - The Core Model Architecture**
 
 This directory is the heart of the Blackhole-LLM project, housing the core language model architecture and the training pipeline that integrates both textual and numerical embeddings. It is here that the tokenized input and the advanced numerical embeddings converge to form a complete, end-to-end training process.
 
-##### Initial Training and a Critical Challenge
+#### **Initial Training and a Critical Challenge**
 
 First-run tests were conducted on a compact 25-million-parameter model using a very limited dataset. These initial runs were not aimed at achieving linguistic proficiency but rather at validating the architectural integrity and stability of the dual-embedding system. The results were twofold:
 
@@ -118,13 +118,13 @@ First-run tests were conducted on a compact 25-million-parameter model using a v
 
     The sheer scale of the `Avg Total Loss`—orders of magnitude higher than the `Avg LM Loss`—underscores the **extreme instability of the old numerical loss**. This behavior was a direct consequence of using the highly sensitive **P1 (Raw)** and **P2 (Z-Score)** normalization methods, which are easily destabilized by outliers in numerical data.
 
-##### Moving Towards Stability: The Quantile Normalization Solution
+#### **Moving Towards Stability: The Quantile Normalization Solution**
 
 The observed instability validated our initial hypothesis: for precise mathematical reasoning, a more robust normalization method is essential. Following these initial tests, a subsequent, smaller training run using the **P2 (Z-Score)** method showed a significant improvement in loss stability. This confirms that the integration of a more sophisticated normalization scheme is the correct path forward.
 
 The team is now meticulously implementing **P6: Quantile Normalization** into the training pipeline. Based on our internal benchmarks, this method offers unparalleled stability and precision, and its full integration is expected to eliminate the loss spikes and pave the way for stable, full-scale training.
 
-##### Model Configuration (`NovaModel`)
+#### **Model Configuration (`NovaModel`)**
 
 The configuration of the `NovaModel` used in these initial tests is detailed below. This architecture is designed to be modular and easily scalable, with specific parameters dedicated to integrating numerical embeddings.
 
