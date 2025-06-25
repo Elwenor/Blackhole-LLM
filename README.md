@@ -28,11 +28,11 @@ From its inception, Blackhole-LLM is being developed with a clear goal: **to sea
 
 My Blackhole-LLM architecture stands out with the following innovations:
 
-  * **Innovative Tokenizer (BlackholeTokenizer)**: A custom extension of `PreTrainedTokenizerFast`, designed for efficient handling of numerical data, mathematical symbols, and structured input. It focuses on reducing vocabulary size while preserving semantic precision.
-  * **Dual Embedding Architecture**: A unique approach to data embedding that combines traditional textual embeddings with advanced numerical embeddings. This allows the model to gain a deeper understanding of both linguistic and quantitative contexts.
-  * **Modular Design**: The project is designed as a collection of independent yet closely integrated modules (`tokenizer`, `embedding`, `nova`), facilitating development, testing, and future expansion.
-  * **Focus on Numerical Data and Mathematics**: The architecture is optimized from the ground up for processing numerical data, making it ideal for applications requiring precise mathematical reasoning.
-  * **Internal Benchmarks and Unit Tests**: Integration of comprehensive tests and benchmarks for individual architectural components (e.g., tokenizer, embeddings) ensures their high quality and comparability.
+  * **Innovative Tokenizer (BlackholeTokenizer)**: A custom extension of `PreTrainedTokenizerFast`, designed for efficient handling of numerical data, mathematical symbols, and structured input. It focuses on reducing vocabulary size while preserving semantic precision.
+  * **Dual Embedding Architecture**: A unique approach to data embedding that combines traditional textual embeddings with advanced numerical embeddings. This allows the model to gain a deeper understanding of both linguistic and quantitative contexts.
+  * **Modular Design**: The project is designed as a collection of independent yet closely integrated modules (`tokenizer`, `embedding`, `nova`), facilitating development, testing, and future expansion.
+  * **Focus on Numerical Data and Mathematics**: The architecture is optimized from the ground up for processing numerical data, making it ideal for applications requiring precise mathematical reasoning.
+  * **Internal Benchmarks and Unit Tests**: Integration of comprehensive tests and benchmarks for individual architectural components (e.g., tokenizer, embeddings) ensures their high quality and comparability.
 
 -----
 
@@ -40,18 +40,31 @@ My Blackhole-LLM architecture stands out with the following innovations:
 
 My Blackhole-LLM project consists of several key packages and scripts that collectively build its architecture:
 
-  * **`blackhole/tokenizer/`**: This directory contains my innovative tokenizer, responsible for text processing, recognition, and special handling of numerical data, symbols, and formatting.
-      * **BlackholeTokenizer**: Currently, there are two versions of the tokenizer.
-          * The **local version** is maintained for isolated development and testing.
-          * The **Hugging Face integrated version (`PreTrainedTokenizerFast`)** is the primary focus of ongoing development and will be the officially supported version for future integrations.
-      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/TOKENIZER.md)
-  * **`blackhole/embedding/`**: These modules are responsible for creating embeddings, including my advanced system for numerical data that transforms numbers into vectors understandable by the model.
-      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
-  * **`blackhole/nova/`**: This is the designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
-  * **`scripts/`**: This directory contains various scripts for project management, including:
-      * Unit tests (`scripts/tests/`).
-      * Benchmark scripts (`scripts/benchmarks/`).
-      * Model training and evaluation scripts (under development).
+  * **`blackhole/tokenizer/`**: This directory contains my innovative tokenizer, responsible for text processing, recognition, and special handling of numerical data, symbols, and formatting.
+      * **BlackholeTokenizer**: Currently, there are two versions of the tokenizer.
+          * The **local version** is maintained for isolated development and testing.
+          * The **Hugging Face integrated version (`PreTrainedTokenizerFast`)** is the primary focus of ongoing development and will be the officially supported version for future integrations.
+      * For detailed information on its operation, benefits, limitations, and the results of my **internal benchmarks**, please refer to: [**Tokenizer Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/TOKENIZER.md)
+  * **`blackhole/embedding/`**: These modules are responsible for creating embeddings, including my advanced system for numerical data that transforms numbers into vectors understandable by the model.
+      * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
+    * **Choice of Normalization and Loss Function**: Based on our extensive internal simulations and benchmarks, we have selected the **Signed Log + Min-Max Normalization (Approach P5)** as the optimal method for transforming numerical values into embedding vectors.
+        * **Formula**: This approach applies a signed logarithmic transformation to compress the range of values while preserving their sign. The transformed values are then scaled using Min-Max normalization. The formula for the transformation is as follows:
+            $$f = \text{sgn}(x) \cdot \log_{10}(|x| + 1)$$
+            $$f' = \frac{f - f_{min}}{f_{max} - f_{min}}$$
+        * **Why P5 is the Best Choice**:
+            * **Robustness**: Our simulations showed that this method consistently achieves a very low cumulative loss across a wide range of values—from extreme magnitudes (`1e+9`, `1e+12`) to fractional, negative, and zero values. Unlike Raw or Z-Score normalization, it effectively prevents feature values from dominating the training process, a key problem we solved with this approach.
+            * **Computational Efficiency**: While not the fastest, its computational complexity is far superior to quantile-based methods (e.g., P6, P7), making it a highly practical choice for large-scale training and real-time inference. It offers an excellent balance between performance and computational cost.
+            * **High Reconstructibility**: The chosen method allows for the accurate reconstruction of the original numerical value from its embedding, which is crucial for tasks requiring precise outputs (e.g., mathematical reasoning, data generation).
+            * **Superiority over alternatives**:
+                * **Raw and Z-Score**: These methods struggle with numerical stability, leading to huge loss values for extreme inputs.
+                * **Min-Max**: While fast, it is highly sensitive to outliers, which can skew the entire feature range.
+                * **Quantile-based**: Although stable, these methods are computationally expensive during inference, as they require a lookup table or a full dataset scan.
+        * **Loss Function**: For the numeric prediction head, we employ the **Mean Squared Error (MSE)** loss, which measures the squared difference between the predicted and target numeric embeddings, ensuring the model learns to represent numerical values accurately.
+  * **`blackhole/nova/`**: This is the designated location for the core language model architecture (e.g., a Transformer class) that will integrate tokens and numerical embeddings.
+  * **`scripts/`**: This directory contains various scripts for project management, including:
+      * Unit tests (`scripts/tests/`).
+      * Benchmark scripts (`scripts/benchmarks/`).
+      * Model training and evaluation scripts (under development).
 
 -----
 
@@ -59,10 +72,10 @@ My Blackhole-LLM project consists of several key packages and scripts that colle
 
 My long-term goal is to build a full, effective LLM that fully leverages the capabilities of my innovative tokenizer and embedding architecture. Subsequent development stages include:
 
-  * Further development and optimization of the main model architecture (`NovaModel`).
-  * Implementation and refinement of the complete LLM training process, utilizing dual embeddings.
-  * Adding advanced evaluation and prediction functionalities for the entire model.
-  * Integration with larger datasets and real-world NLP tasks.
+  * Further development and optimization of the main model architecture (`NovaModel`).
+  * Implementation and refinement of the complete LLM training process, utilizing dual embeddings.
+  * Adding advanced evaluation and prediction functionalities for the entire model.
+  * Integration with larger datasets and real-world NLP tasks.
 
 -----
 
@@ -73,5 +86,3 @@ This project is licensed under the [MIT License](https://www.google.com/search?q
 -----
 
 💡 **Note**: As an architectural project focused on innovation, there are no immediate installation or execution instructions provided in this `README.md`. The detailed design and benchmark results for the tokenizer and embeddings are available in their respective documentation files.
-
------
