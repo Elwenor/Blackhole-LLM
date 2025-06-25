@@ -60,15 +60,15 @@ These modules are responsible for creating embeddings, including my advanced sys
 
 * Learn more about my numerical embeddings architecture, its benefits, challenges, and future plans here: [**Numerical Embeddings Details and Benchmarks**](https://github.com/Elwenor/Blackhole-LLM/blob/main/benchmark/EMBEDDING.md)
 
-* **Choice of Normalization and Loss Function**: Based on our extensive internal simulations and benchmarks, we have selected the **Signed Log + Min-Max Normalization (Approach P5)** as the optimal method for transforming numerical values into embedding vectors. This choice was driven by a key challenge: preventing extreme numerical values from destabilizing the training process.
+* **Choice of Normalization and Loss Function**: Based on our extensive internal simulations and benchmarks, we have selected the **Signed Log + Min-Max Normalization** as the optimal method for transforming numerical values into embedding vectors. This choice was driven by a key challenge: preventing extreme numerical values from destabilizing the training process.
 
     * **Formula**: This approach applies a signed logarithmic transformation to compress the range of values while preserving their sign. The transformed values are then scaled using Min-Max normalization. The formula for the transformation is as follows:
         $$f = \text{sgn}(x) \cdot \log_{10}(|x| + 1)$$
         $$f' = \frac{f - f_{min}}{f_{max} - f_{min}}$$
 
-    * **Why P5 is the Best Choice**:
+    * **Why Signed Log + Min-Max Normalization is the Best Choice**:
         * **Robustness**: Our simulations showed that this method consistently achieves a very low cumulative loss across a wide range of values—from extreme magnitudes (`1e+9`, `1e+12`) to fractional, negative, and zero values. Unlike simpler normalizations, it effectively prevents feature values from dominating the training process.
-        * **Computational Efficiency**: While not the fastest, its computational complexity is far superior to quantile-based methods (e.g., P6, P7), making it a highly practical choice for large-scale training and real-time inference. It offers an excellent balance between performance and computational cost.
+        * **Computational Efficiency**: While not the fastest, its computational complexity is far superior to quantile-based methods (e.g., (Quantile), (Quantile + Signed Log)), making it a highly practical choice for large-scale training and real-time inference. It offers an excellent balance between performance and computational cost.
         * **High Reconstructibility**: The chosen method allows for the accurate reconstruction of the original numerical value from its embedding, which is crucial for tasks requiring precise outputs (e.g., mathematical reasoning, data generation).
         * **Superiority over alternatives**:
             * **Raw and Z-Score**: These methods struggle with numerical stability, leading to huge loss values for extreme inputs.
