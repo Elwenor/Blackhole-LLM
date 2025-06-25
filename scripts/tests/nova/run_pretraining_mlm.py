@@ -122,16 +122,6 @@ def main():
     )
     model = BlackholeForMaskedLM(config)
 
-    # Jeśli tokenizator został zmodyfikowany (np. dodano tokeny) PO inicjalizacji modelu,
-    # należy zmienić rozmiar embeddingów modelu.
-    # W tym przypadku, jeśli tokenizator jest tworzony od nowa i dodajemy tokeny,
-    # to model jest tworzony z prawidłowym vocab_size, więc resize_token_embeddings
-    # nie jest bezwzględnie konieczne, ale nie zaszkodzi dla pewności.
-    # Jeśli ładujesz istniejący tokenizator i dodajesz tokeny, to jest to KRYTYCZNE.
-    # W tym przypadku, jeśli blok 'else' jest uruchamiany, to `num_added_tokens` będzie > 0.
-    # Jeśli blok 'if' jest uruchamiany (tokenizator już istnieje), to `num_added_tokens` będzie 0.
-    # Możesz to uprościć, wywołując resize_token_embeddings zawsze po inicjalizacji modelu,
-    # jeśli len(tokenizer) != model.config.vocab_size
     if len(tokenizer) != model.config.vocab_size:
         model.resize_token_embeddings(len(tokenizer))
         logger.info(f"Zmieniono rozmiar embeddingów modelu na {len(tokenizer)}.")
@@ -174,7 +164,7 @@ def main():
     # Zdefiniuj procent danych do użycia
     # Zalecane: Zacznij od mniejszego procentu (np. 0.1) dla szybkich testów,
     # a potem zwiększaj do 1.0 dla pełnego treningu.
-    TRAIN_DATA_PERCENTAGE = 0.5 # Użyj 50% danych treningowych GSM8K
+    TRAIN_DATA_PERCENTAGE = 1.0
     EVAL_DATA_PERCENTAGE = 1.0  # Użyj 100% danych walidacyjnych GSM8K
 
     # Utwórz instancje datasetów dla Twojego Trainera
