@@ -135,9 +135,10 @@ FINAL MODEL ANSWER:
 
 The model's primary limitation is **poor numerical precision**, a known issue stemming from the legacy processing pipeline used during this test phase.
 
-  * **Random Numerical Outputs:** As seen in the logs, for a simple query like `What is 4 x 2`, the model correctly attempts to output a number, but the predicted value is random (e.g., `7.9749`) rather than the correct answer.
-  * **Legacy Pipeline:** This instability and lack of precision are caused by the **older numerical processing methods (P1 and P2)** used for decoding. These methods are prone to "blowouts" and inaccurate predictions.
-  * **No Symbolic Reasoning:** Due to its small size and training constraints, the model is unable to perform symbolic reasoning, failing to solve algebraic equations or logical problems.
+* **Data Labeling Error:** A critical issue was identified in the training database. Instances where no answer was available were erroneously labeled as `no answer`. This created a training bias, causing the model to **blindly output `no answer`** for tasks it did not understand, preventing it from even attempting to reason or find a solution.
+* **Random Numerical Outputs:** As seen in the logs, for a simple query like `What is 4 x 2`, the model correctly attempts to output a number, but the predicted value is random (e.g., `7.9749`) rather than the correct answer.
+* **Legacy Pipeline:** This instability and lack of precision are caused by the **older numerical processing methods (P1 and P2)** used for decoding. These methods are prone to "blowouts" and inaccurate predictions.
+* **No Symbolic Reasoning:** Due to its small size and training constraints, the model is unable to perform symbolic reasoning, failing to solve algebraic equations or logical problems.
 
 ## Roadmap & Future Improvements
 
