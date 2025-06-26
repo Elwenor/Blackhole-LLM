@@ -18,6 +18,113 @@ The trained model weights are saved as a checkpoint in the standard PyTorch form
 
 The finetuning process **yielded clear results**, demonstrating the model's ability to learn a new response pattern. However, as a test version, it also highlighted a critical limitation.
 
+### Key Log Examples with Top 3 Logit Analysis
+
+**Example 1: Simple Multiplication**
+
+This query demonstrates the model's ability to identify numbers but its complete failure to perform a calculation.
+
+```
+>>> Enter query: What is 4 x 2
+
+[DEBUG] Processing query: 'What is 4 x 2'
+[DEBUG] Detected token '[NUM]' at positions: [3, 5]
+
+[INFO] Running encoder...
+
+[INFO] Starting decoding...
+
+--- GENERATION STEP 1 ---
+[DEBUG] Current token sequence:
+[DEBUG] LM logits for the next token:
+  1. Token '[CLS]' (ID: 1) | Probability: 99.95%
+  2. Token '[NUM]' (ID: 5) | Probability: 0.02%
+  3. Token '[SEP]' (ID: 2) | Probability: 0.00%
+
+--- GENERATION STEP 2 ---
+[DEBUG] Current token sequence: [CLS]
+[DEBUG] LM logits for the next token:
+  1. Token 'b' (ID: 62) | Probability: 11.13%
+  2. Token 'no' (ID: 1243) | Probability: 8.65%
+  3. Token 'the' (ID: 1096) | Probability: 4.69%
+
+--- GENERATION STEP 3 ---
+[DEBUG] Current token sequence: [CLS] b
+[DEBUG] LM logits for the next token:
+  1. Token ''' (ID: 14) | Probability: 9.08%
+  2. Token 'the' (ID: 1096) | Probability: 2.14%
+  3. Token '[SEP]' (ID: 2) | Probability: 1.47%
+
+--- GENERATION STEP 4 ---
+[DEBUG] Current token sequence: [CLS] b '
+[DEBUG] LM logits for the next token:
+  1. Token '[NUM]' (ID: 5) | Probability: 99.68% | ASSIGNED NUMERICAL VALUE: 7.9749
+  2. Token '[SEP]' (ID: 2) | Probability: 0.02%
+  3. Token 'answer' (ID: 1314) | Probability: 0.01%
+
+--- GENERATION STEP 5 ---
+[DEBUG] Current token sequence: [CLS] b ' [NUM]
+[DEBUG] LM logits for the next token:
+  1. Token '[SEP]' (ID: 2) | Probability: 5.27%
+  2. Token '%' (ID: 12) | Probability: 2.54%
+  3. Token '\' (ID: 56) | Probability: 1.97%
+
+==================================================
+FINAL MODEL ANSWER:
+  -> Decoded sequence: b '
+  -> Answer with numerical predictions: b ' 7.9749
+==================================================
+```
+
+**Example 2: Algebraic Equation**
+
+This query illustrates the model's cautious behavior in the face of a complex, symbolic problem.
+
+```
+>>> Enter query: Solve for x: 2*x + 4 = 12
+
+[DEBUG] Processing query: 'Solve for x: 2*x + 4 = 12'
+[DEBUG] Detected token '[NUM]' at positions: [5, 9, 11]
+
+[INFO] Running encoder...
+
+[INFO] Starting decoding...
+
+--- GENERATION STEP 1 ---
+[DEBUG] Current token sequence:
+[DEBUG] LM logits for the next token:
+  1. Token '[CLS]' (ID: 1) | Probability: 99.83%
+  2. Token '[SEP]' (ID: 2) | Probability: 0.04%
+  3. Token 'of' (ID: 1105) | Probability: 0.01%
+
+--- GENERATION STEP 2 ---
+[DEBUG] Current token sequence: [CLS]
+[DEBUG] LM logits for the next token:
+  1. Token 'no' (ID: 1243) | Probability: 17.97%
+  2. Token 'the' (ID: 1096) | Probability: 9.95%
+  3. Token '[SEP]' (ID: 2) | Probability: 3.28%
+
+--- GENERATION STEP 3 ---
+[DEBUG] Current token sequence: [CLS] no
+[DEBUG] LM logits for the next token:
+  1. Token 'answer' (ID: 1314) | Probability: 99.72%
+  2. Token '[SEP]' (ID: 2) | Probability: 0.05%
+  3. Token '[NUM]' (ID: 5) | Probability: 0.04% | ASSIGNED NUMERICAL VALUE: 3.3026
+
+--- GENERATION STEP 4 ---
+[DEBUG] Current token sequence: [CLS] no answer
+[DEBUG] LM logits for the next token:
+  1. Token '[SEP]' (ID: 2) | Probability: 99.95%
+  2. Token 'of' (ID: 1105) | Probability: 0.01%
+  3. Token ',' (ID: 19) | Probability: 0.00%
+
+==================================================
+FINAL MODEL ANSWER:
+  -> Decoded sequence: no answer
+  -> Answer with numerical predictions: no answer
+==================================================
+```
+
 ### ✅ Key Achievements
 
   * **Recognized Numerical Queries:** The model successfully learned to detect numbers in the input text and tokenize them as `[NUM]`, a crucial first step in numerical processing.
